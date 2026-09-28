@@ -1,0 +1,160 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace CodexUsageBar
+{
+    internal static class Program
+    {
+        [STAThread]
+        public static int Main(string[] args)
+        {
+            if (args.Length > 0 && args[0].StartsWith("--print-", StringComparison.Ordinal))
+            {
+                try
+                {
+                    Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), new UTF8Encoding(false)) { AutoFlush = true });
+                    Console.SetError(new StreamWriter(Console.OpenStandardError(), new UTF8Encoding(false)) { AutoFlush = true });
+                    UsageSnapshot snapshot;
+                    switch (args[0])
+                    {
+                        case "--print-claude-live-usage": snapshot = new ClaudeLiveFetcher().FetchSynchronously(); break;
+                        case "--print-claude-usage": snapshot = new ClaudeUsageStore().LatestSnapshot(); break;
+                        case "--print-live-usage": snapshot = new CodexLiveFetcher().FetchSynchronously(); break;
+                        case "--print-usage": snapshot = new CodexLocalStore().LatestSnapshot(); break;
+                        default: Console.Error.WriteLine("알 수 없는 진단 옵션"); return 2;
+                    }
+                    if (snapshot == null) { Console.Error.WriteLine("사용량 기록 없음"); return 1; }
+                    Console.WriteLine(Json.Serialize(snapshot.ToJson()));
+                    return 0;
+                }
+                catch (Exception error)
+                {
+                    // Only display our own sanitized errors, never credentials/HTTP bodies.
+                    Console.Error.WriteLine(error is LiveUsageException || error is UsageStoreException
+                        ? error.Message : "사용량 진단 실패 (" + error.GetType().Name + ")");
+                    return 1;
+                }
+            }
+
+            bool created;
+            using (var mutex = new Mutex(true, @"Local\CodexUsageBar.Windows", out created))
+            {
+                if (!created) return 0;
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
+                using (var context = new UsageApplicationContext()) Application.Run(context);
+                mutex.ReleaseMutex();
+            }
+            return 0;
+        }
+    }
+
+    internal sealed class UsageApplicationContext : ApplicationContext
+    {
+        private readonly AppSettings settings = AppSettings.Load();
+        private readonly ProviderWatcher watcher = new ProviderWatcher();
+        private readonly TaskbarWidget widget = new TaskbarWidget();
+        private readonly Dictionary<UsageProvider, ProviderUsageState> states = new Dictionary<UsageProvider, ProviderUsageState>();
+        private readonly Dictionary<UsageProvider, UsageCoordinator> coordinators = new Dictionary<UsageProvider, UsageCoordinator>();
+        private readonly DetailsPopup popup;
+        private readonly System.Windows.Forms.Timer clockTimer;
+        private UsageProvider active;
+
+        public UsageApplicationContext()
+        {
+            foreach (UsageProvider provider in Enum.GetValues(typeof(UsageProvider)))
+                states[provider] = new ProviderUsageState { Snapshot = settings.Snapshot(provider), Status = "앱 실행 대기 중", Health = ConnectionHealth.Working };
+            var codexLocal = new CodexLocalStore();
+            var codexLive = new CodexLiveFetcher();
+            var claudeLocal = new ClaudeUsageStore();
+            var claudeLive = new ClaudeLiveFetcher();
+            AddCoordinator(UsageProvider.Codex, new UsageCoordinator(codexLocal.LatestSnapshot, codexLive.FetchSynchronously,
+                "Codex", "Codex 로컬 세션 기록", "Codex 계정 API · 실시간", TimeSpan.FromSeconds(20)));
+            AddCoordinator(UsageProvider.Claude, new UsageCoordinator(claudeLocal.LatestSnapshot, claudeLive.FetchSynchronously,
+                "Claude", "Claude 로컬 기록", "Claude 로그인 토큰 API · 실시간", TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(20)));
+            active = settings.LastActiveProvider ?? UsageProvider.Codex;
+            popup = new DetailsPopup(provider => states[provider], () => active);
+            popup.RefreshRequested += delegate { foreach (var coordinator in coordinators.Values) coordinator.RefreshLive(true); };
+            popup.QuitRequested += delegate { ExitThread(); };
+            widget.LeftClick += delegate { TogglePopup(); };
+            widget.RightClick += delegate { TogglePopup(); };
+            watcher.Launched += provider => { coordinators[provider].Start(settings.Snapshot(provider)); UpdateProvider(); };
+            watcher.Terminated += provider =>
+            {
+                coordinators[provider].Stop();
+                states[provider].Status = "앱 종료됨 · 마지막 기록 표시";
+                states[provider].Health = ConnectionHealth.Degraded;
+                UpdateProvider();
+            };
+            watcher.Activated += provider => { active = provider; settings.SetLastActiveProvider(provider); UpdateDisplay(); };
+            watcher.Start();
+            foreach (var provider in watcher.RunningProviders) coordinators[provider].Start(settings.Snapshot(provider));
+            UpdateProvider();
+            clockTimer = new System.Windows.Forms.Timer { Interval = 30000 };
+            clockTimer.Tick += delegate { UpdateDisplay(); };
+            clockTimer.Start();
+        }
+
+        private void AddCoordinator(UsageProvider provider, UsageCoordinator coordinator)
+        {
+            coordinators[provider] = coordinator;
+            coordinator.SnapshotChanged += snapshot => { states[provider].Snapshot = snapshot; settings.SetSnapshot(provider, snapshot); UpdateDisplay(); };
+            coordinator.Checked += at => { states[provider].CheckedAt = at; };
+            coordinator.StatusChanged += (status, health) => { states[provider].Status = status; states[provider].Health = health; UpdateDisplay(); };
+        }
+
+        private void UpdateProvider()
+        {
+            active = ProviderWatcher.PreferredProvider(watcher.FrontmostProvider(), watcher.RunningProviders.ToList(), active);
+            settings.SetLastActiveProvider(active);
+            widget.SetVisible(watcher.IsAnyProviderRunning);
+            if (!watcher.IsAnyProviderRunning) popup.Hide();
+            UpdateDisplay();
+        }
+
+        private void UpdateDisplay()
+        {
+            var state = states[active];
+            var snapshot = state.Snapshot;
+            var tooltip = active.DisplayName() + " · " + (state.Status ?? "연결 중");
+            if (snapshot != null)
+            {
+                tooltip += "\n" + string.Join("\n", snapshot.Windows.Select(window => window.Label + ": " + window.RemainingPercent + "% 남음"));
+                tooltip += "\n데이터: " + UsageFormat.Age(snapshot.FetchedAt, DateTime.UtcNow);
+            }
+            widget.SetContent(new WidgetContent
+            {
+                Provider = active, RemainingPercent = snapshot == null ? (int?)null : snapshot.OverallRemainingPercent,
+                Stale = state.Health != ConnectionHealth.Ok || snapshot == null || DateTime.UtcNow - snapshot.FetchedAt > TimeSpan.FromMinutes(10),
+                Tooltip = tooltip
+            });
+            if (popup != null) popup.Refresh(true);
+        }
+
+        private void TogglePopup()
+        {
+            widget.HideTooltip();
+            if (popup.Visible) { popup.Hide(); return; }
+            if (!popup.ClosedJustNow) popup.ShowAbove(widget.ScreenBounds, widget.Scale, widget.IsDark);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                clockTimer.Dispose();
+                watcher.Dispose();
+                foreach (var coordinator in coordinators.Values) coordinator.Dispose();
+                popup.Dispose();
+                widget.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+    }
+}
