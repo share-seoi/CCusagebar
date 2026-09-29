@@ -86,7 +86,8 @@ namespace CodexUsageBar
             AddCoordinator(UsageProvider.Claude, new UsageCoordinator(claudeLocal.LatestSnapshot, claudeLive.FetchSynchronously,
                 "Claude", "Claude 로컬 기록", "Claude 로그인 토큰 API · 실시간", TimeSpan.FromSeconds(20), ClaudeHiddenInterval));
             active = settings.LastActiveProvider ?? UsageProvider.Codex;
-            popup = new DetailsPopup(provider => states[provider], () => active);
+            popup = new DetailsPopup(provider => states[provider], IsShown, () => settings.ShowBoth);
+            popup.DisplayModeToggled += delegate { settings.SetShowBoth(!settings.ShowBoth); UpdateDisplay(); };
             popup.RefreshRequested += delegate { foreach (var coordinator in coordinators.Values) coordinator.RefreshLive(true); };
             popup.QuitRequested += delegate { ExitThread(); };
             widget.LeftClick += delegate { TogglePopup(); };
@@ -133,27 +134,49 @@ namespace CodexUsageBar
 
         private void UpdateDisplay()
         {
-            coordinators[UsageProvider.Claude].SetLiveInterval(active == UsageProvider.Claude ? ClaudeShownInterval : ClaudeHiddenInterval);
-            var state = states[active];
-            var snapshot = state.Snapshot;
-            var tooltip = active.DisplayName() + " · " + (state.Status ?? "연결 중");
-            if (snapshot != null)
+            coordinators[UsageProvider.Claude].SetLiveInterval(IsShown(UsageProvider.Claude) ? ClaudeShownInterval : ClaudeHiddenInterval);
+            var now = DateTime.UtcNow;
+            var content = new WidgetContent();
+            var tooltip = new List<string>();
+            foreach (var provider in ShownProviders())
             {
-                tooltip += "\n" + string.Join("\n", snapshot.Windows.Select(window => window.Label + ": " + window.RemainingPercent + "% 남음"));
-                tooltip += "\n데이터: " + UsageFormat.Age(snapshot.FetchedAt, DateTime.UtcNow);
+                var state = states[provider];
+                var snapshot = state.Snapshot;
+                tooltip.Add(provider.DisplayName() + " · " + (state.Status ?? "연결 중"));
+                if (snapshot != null)
+                {
+                    tooltip.AddRange(snapshot.Windows.Select(window => window.Label + ": " + window.RemainingPercent + "% 남음"));
+                    tooltip.Add("데이터: " + UsageFormat.Age(snapshot.FetchedAt, now));
+                }
+                content.Sections.Add(new WidgetSection
+                {
+                    Provider = provider,
+                    Gauges = snapshot == null
+                        ? new List<Gauge>()
+                        : snapshot.Windows.Select(window => new Gauge { Label = window.ShortLabel, RemainingPercent = window.RemainingPercent }).ToList(),
+                    // Fade only when the numbers themselves are old. A failed live request with a
+                    // fresh local record keeps full opacity; the popup still shows the error.
+                    Stale = IsStale(snapshot, now)
+                });
             }
-            widget.SetContent(new WidgetContent
-            {
-                Provider = active,
-                Gauges = snapshot == null
-                    ? new List<Gauge>()
-                    : snapshot.Windows.Select(window => new Gauge { Label = window.ShortLabel, RemainingPercent = window.RemainingPercent }).ToList(),
-                // Fade only when the numbers themselves are old. A failed live request with a
-                // fresh local record keeps full opacity; the popup still shows the error.
-                Stale = IsStale(snapshot, DateTime.UtcNow),
-                Tooltip = tooltip
-            });
+            content.Tooltip = string.Join("\n", tooltip);
+            widget.SetContent(content);
             if (popup != null) popup.Refresh(true);
+        }
+
+        private bool IsShown(UsageProvider provider)
+        {
+            return ShownProviders().Contains(provider);
+        }
+
+        /// 자동 전환이면 앞에 띄운 앱 하나. "둘 다"면 실행 중이거나 받은 값이 있는 앱을 Codex, Claude 순으로.
+        private List<UsageProvider> ShownProviders()
+        {
+            if (!settings.ShowBoth) return new List<UsageProvider> { active };
+            var running = watcher.RunningProviders.ToList();
+            var both = new[] { UsageProvider.Codex, UsageProvider.Claude }
+                .Where(provider => running.Contains(provider) || states[provider].Snapshot != null).ToList();
+            return both.Count == 0 ? new List<UsageProvider> { active } : both;
         }
 
         internal static bool IsStale(UsageSnapshot snapshot, DateTime now)

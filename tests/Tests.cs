@@ -154,7 +154,7 @@ namespace CodexUsageBar
                 claudeState.Status = error ? "Claude 토큰 인증 실패 (HTTP 401) · Claude 앱 로그인 확인 필요 · 마지막 기록 표시" : "Claude 로그인 토큰 API · 실시간";
                 claudeState.Health = error ? ConnectionHealth.Degraded : ConnectionHealth.Ok;
                 var suffix = (renderScale == 1f ? "" : "-" + (int)(renderScale * 100)) + (error ? "-error" : "");
-                using (var popup = new DetailsPopup(provider => provider == UsageProvider.Claude ? claudeState : codexState, () => UsageProvider.Codex))
+                using (var popup = new DetailsPopup(provider => provider == UsageProvider.Claude ? claudeState : codexState, provider => provider == UsageProvider.Codex, () => false))
                 {
                     popup.ShowAbove(new Rectangle(-2000, -2000, 100, 50), renderScale, dark);
                     popup.Hide();
@@ -164,16 +164,23 @@ namespace CodexUsageBar
                         image.Save(Path.Combine(directory, (dark ? "popup-dark" : "popup-light") + suffix + ".png"));
                     }
                 }
-                var single = new WidgetContent { Provider = UsageProvider.Codex, Gauges = new List<Gauge> { new Gauge { Label = "W", RemainingPercent = 75 } } };
-                using (var image = BatteryRenderer.Render(single, new Size(BatteryRenderer.Width(renderScale, single.Gauges), (int)(48 * renderScale)), renderScale, dark, false))
+                var codexGauges = new List<Gauge> { new Gauge { Label = "W", RemainingPercent = 75 } };
+                var claudeGauges = new List<Gauge> { new Gauge { Label = "5h", RemainingPercent = 63 }, new Gauge { Label = "W", RemainingPercent = 12 } };
+                var single = WidgetContent.Single(UsageProvider.Codex, codexGauges);
+                using (var image = BatteryRenderer.Render(single, new Size(BatteryRenderer.Width(renderScale, single), (int)(48 * renderScale)), renderScale, dark, false))
                     image.Save(Path.Combine(directory, (dark ? "battery-dark" : "battery-light") + suffix + ".png"));
-                var dual = new WidgetContent
-                {
-                    Provider = UsageProvider.Claude,
-                    Gauges = new List<Gauge> { new Gauge { Label = "5h", RemainingPercent = 63 }, new Gauge { Label = "W", RemainingPercent = 12 } }
-                };
-                using (var image = BatteryRenderer.Render(dual, new Size(BatteryRenderer.Width(renderScale, dual.Gauges), (int)(48 * renderScale)), renderScale, dark, false))
+                var dual = WidgetContent.Single(UsageProvider.Claude, claudeGauges);
+                using (var image = BatteryRenderer.Render(dual, new Size(BatteryRenderer.Width(renderScale, dual), (int)(48 * renderScale)), renderScale, dark, false))
                     image.Save(Path.Combine(directory, (dark ? "battery-dual-dark" : "battery-dual-light") + suffix + ".png"));
+                // "둘 다 표시": Codex fresh, Claude stale, so only the Claude half fades.
+                var both = new WidgetContent { Sections = new List<WidgetSection> {
+                    new WidgetSection { Provider = UsageProvider.Codex, Gauges = codexGauges },
+                    new WidgetSection { Provider = UsageProvider.Claude, Gauges = claudeGauges, Stale = true } } };
+                // Two sections share one outer padding (7+7) but add a 12px gap between them.
+                Check(Math.Abs(BatteryRenderer.Width(renderScale, both) - (BatteryRenderer.Width(renderScale, single) + BatteryRenderer.Width(renderScale, dual) - 2 * renderScale)) <= 2,
+                    "both-apps widget fits both sections side by side");
+                using (var image = BatteryRenderer.Render(both, new Size(BatteryRenderer.Width(renderScale, both), (int)(48 * renderScale)), renderScale, dark, false))
+                    image.Save(Path.Combine(directory, (dark ? "battery-both-dark" : "battery-both-light") + suffix + ".png"));
             }
             Check(true, "UI rendered");
         }

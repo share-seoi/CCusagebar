@@ -155,13 +155,24 @@ namespace CodexUsageBar
         public int RemainingPercent;
     }
 
-    /// 작업표시줄 위젯 한 칸에 그릴 내용. 한도가 없으면 "--" 배터리 하나를 그린다.
-    internal sealed class WidgetContent
+    /// 앱 하나의 "아이콘 + 배터리" 묶음. 한도가 없으면 "--" 배터리 하나를 그린다.
+    internal sealed class WidgetSection
     {
         public UsageProvider Provider;
         public List<Gauge> Gauges = new List<Gauge>();
         public bool Stale;
+    }
+
+    /// 작업표시줄 위젯에 그릴 내용. 보통은 앱 하나, "둘 다 표시"면 Codex와 Claude를 나란히 그린다.
+    internal sealed class WidgetContent
+    {
+        public List<WidgetSection> Sections = new List<WidgetSection>();
         public string Tooltip;
+
+        public static WidgetContent Single(UsageProvider provider, List<Gauge> gauges)
+        {
+            return new WidgetContent { Sections = new List<WidgetSection> { new WidgetSection { Provider = provider, Gauges = gauges } } };
+        }
     }
 
     /// 작업표시줄에 들어가는 "앱 아이콘 + 배터리" 그림. 투명 배경 위에 알파 채널로 그린다.
@@ -178,13 +189,26 @@ namespace CodexUsageBar
         private const float LabelWidth = 14f;
         private const float LabelGap = 2f;
         private const float GaugeGap = 7f;
+        private const float SectionGap = 12f;
+
+        public static int Width(float scale, WidgetContent content)
+        {
+            var sections = content.Sections.Count == 0 ? new List<WidgetSection> { new WidgetSection() } : content.Sections;
+            float width = sections.Sum(section => SectionWidth(section.Gauges)) + SectionGap * (sections.Count - 1);
+            return (int)Math.Ceiling((PaddingX + width + PaddingX) * scale);
+        }
 
         public static int Width(float scale, IList<Gauge> gauges)
+        {
+            return (int)Math.Ceiling((PaddingX + SectionWidth(gauges) + PaddingX) * scale);
+        }
+
+        private static float SectionWidth(IList<Gauge> gauges)
         {
             int count = Math.Max(1, gauges.Count);
             float width = (BodyWidth + NubGap + NubWidth) * count + GaugeGap * (count - 1);
             width += gauges.Count(HasLabel) * (LabelWidth + LabelGap);
-            return (int)Math.Ceiling((PaddingX + IconSize + Gap + width + PaddingX) * scale);
+            return IconSize + Gap + width;
         }
 
         // Label every battery, even a lone one, so a weekly-only account reads "W 96%"
@@ -215,22 +239,28 @@ namespace CodexUsageBar
                     }
                 }
 
-                // 기록이 오래됐으면 전체를 흐리게 그려 한눈에 알 수 있게 한다.
-                var layer = content.Stale ? new Bitmap(size.Width, size.Height, PixelFormat.Format32bppArgb) : null;
-                var target = layer == null ? g : Graphics.FromImage(layer);
+                // 기록이 오래된 앱은 그 묶음만 흐리게 그려 한눈에 알 수 있게 한다.
+                var layer = content.Sections.Any(section => section.Stale) ? new Bitmap(size.Width, size.Height, PixelFormat.Format32bppArgb) : null;
+                var faded = layer == null ? null : Graphics.FromImage(layer);
                 try
                 {
-                    if (layer != null)
+                    if (faded != null)
                     {
-                        target.SmoothingMode = SmoothingMode.AntiAlias;
-                        target.PixelOffsetMode = PixelOffsetMode.HighQuality;
-                        target.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+                        faded.SmoothingMode = SmoothingMode.AntiAlias;
+                        faded.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                        faded.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
                     }
-                    DrawContent(target, content, size, scale, dark);
+                    float x = PaddingX * scale;
+                    var sections = content.Sections.Count == 0 ? new List<WidgetSection> { new WidgetSection() } : content.Sections;
+                    foreach (var section in sections)
+                    {
+                        DrawSection(section.Stale ? faded : g, section, x, size.Height / 2f, scale, dark);
+                        x += (SectionWidth(section.Gauges) + SectionGap) * scale;
+                    }
                 }
                 finally
                 {
-                    if (layer != null) target.Dispose();
+                    if (faded != null) faded.Dispose();
                 }
                 if (layer != null)
                 {
@@ -245,22 +275,19 @@ namespace CodexUsageBar
             return bitmap;
         }
 
-        private static void DrawContent(Graphics g, WidgetContent content, Size size, float scale, bool dark)
+        private static void DrawSection(Graphics g, WidgetSection section, float x, float centerY, float scale, bool dark)
         {
             var foreground = dark ? Color.White : Color.FromArgb(0x1B, 0x1B, 0x1B);
-            float centerY = size.Height / 2f;
-
-            float x = PaddingX * scale;
-            ProviderIcons.Draw(g, content.Provider, dark, new RectangleF(x, centerY - IconSize * scale / 2, IconSize * scale, IconSize * scale));
+            ProviderIcons.Draw(g, section.Provider, dark, new RectangleF(x, centerY - IconSize * scale / 2, IconSize * scale, IconSize * scale));
             x += (IconSize + Gap) * scale;
 
-            if (content.Gauges.Count == 0)
+            if (section.Gauges.Count == 0)
             {
                 DrawBattery(g, x, centerY, null, scale, dark, foreground);
                 return;
             }
 
-            foreach (var gauge in content.Gauges)
+            foreach (var gauge in section.Gauges)
             {
                 if (HasLabel(gauge))
                 {

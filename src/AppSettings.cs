@@ -6,13 +6,14 @@ using Microsoft.Win32;
 
 namespace CodexUsageBar
 {
-    /// 마지막으로 표시한 앱과 마지막 스냅샷을 %LOCALAPPDATA%\CodexUsageBar\state.json에 저장한다.
+    /// 마지막으로 표시한 앱, "둘 다 표시" 여부, 마지막 스냅샷을 %LOCALAPPDATA%\CodexUsageBar\state.json에 저장한다.
     internal sealed class AppSettings
     {
         private readonly string path;
         private readonly Dictionary<UsageProvider, UsageSnapshot> snapshots = new Dictionary<UsageProvider, UsageSnapshot>();
 
         public UsageProvider? LastActiveProvider;
+        public bool ShowBoth;
 
         private AppSettings()
         {
@@ -30,6 +31,7 @@ namespace CodexUsageBar
                 if (!File.Exists(settings.path)) return settings;
                 var root = Json.TryParse(File.ReadAllText(settings.path, Encoding.UTF8)) as Dictionary<string, object>;
                 settings.LastActiveProvider = UsageProviderExtensions.FromKey(Json.Get(root, "lastActiveProvider") as string);
+                settings.ShowBoth = Json.Get(root, "showBoth") as bool? ?? false;
                 var saved = Json.Object(root, "snapshots");
                 foreach (UsageProvider provider in Enum.GetValues(typeof(UsageProvider)))
                 {
@@ -63,6 +65,13 @@ namespace CodexUsageBar
             Save();
         }
 
+        public void SetShowBoth(bool showBoth)
+        {
+            if (ShowBoth == showBoth) return;
+            ShowBoth = showBoth;
+            Save();
+        }
+
         private void Save()
         {
             try
@@ -75,6 +84,7 @@ namespace CodexUsageBar
                 var root = new Dictionary<string, object>
                 {
                     { "lastActiveProvider", LastActiveProvider.HasValue ? LastActiveProvider.Value.Key() : null },
+                    { "showBoth", ShowBoth },
                     { "snapshots", saved }
                 };
                 Directory.CreateDirectory(Path.GetDirectoryName(path));

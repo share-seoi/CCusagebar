@@ -13,6 +13,7 @@ namespace CodexUsageBar
     {
         public event EventHandler RefreshRequested;
         public event EventHandler QuitRequested;
+        public event EventHandler DisplayModeToggled;
 
         private const float BaseWidth = 600f;
         private const float LayoutPadding = 12f;
@@ -20,7 +21,8 @@ namespace CodexUsageBar
         private const float ActionBarHeight = 36f;
 
         private readonly Func<UsageProvider, ProviderUsageState> stateFor;
-        private readonly Func<UsageProvider> activeProvider;
+        private readonly Func<UsageProvider, bool> isShown;
+        private readonly Func<bool> showBoth;
         private readonly Timer clockTimer;
         private readonly Dictionary<string, Rectangle> buttons = new Dictionary<string, Rectangle>();
         private string hoveredButton;
@@ -28,10 +30,11 @@ namespace CodexUsageBar
         private bool dark;
         private DateTime lastHiddenAt = DateTime.MinValue;
 
-        public DetailsPopup(Func<UsageProvider, ProviderUsageState> stateFor, Func<UsageProvider> activeProvider)
+        public DetailsPopup(Func<UsageProvider, ProviderUsageState> stateFor, Func<UsageProvider, bool> isShown, Func<bool> showBoth)
         {
             this.stateFor = stateFor;
-            this.activeProvider = activeProvider;
+            this.isShown = isShown;
+            this.showBoth = showBoth;
 
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
@@ -166,6 +169,8 @@ namespace CodexUsageBar
             DrawButton(g, "refresh", "새로고침", new Rectangle((int)padding, (int)buttonY, (int)(100 * scale), (int)(ActionBarHeight * scale)), foreground);
             DrawButton(g, "autostart", AutoStart.IsEnabled ? "자동 시작: 켜짐" : "자동 시작: 꺼짐",
                 new Rectangle((int)(padding + 110 * scale), (int)buttonY, (int)(160 * scale), (int)(ActionBarHeight * scale)), foreground);
+            DrawButton(g, "display", showBoth() ? "표시: 둘 다" : "표시: 자동 전환",
+                new Rectangle((int)(padding + 280 * scale), (int)buttonY, (int)(150 * scale), (int)(ActionBarHeight * scale)), foreground);
             DrawButton(g, "quit", "종료", new Rectangle(ClientSize.Width - (int)(80 * scale + padding), (int)buttonY,
                 (int)(80 * scale), (int)(ActionBarHeight * scale)), foreground);
         }
@@ -177,7 +182,7 @@ namespace CodexUsageBar
             var state = stateFor(provider);
             float x = bounds.X + 14 * scale, y = bounds.Y + 15 * scale, width = bounds.Width - 28 * scale;
             ProviderIcons.Draw(g, provider, dark, new RectangleF(x, y, 23 * scale, 23 * scale));
-            DrawText(g, provider.DisplayName() + (activeProvider() == provider ? "  · 표시 중" : ""),
+            DrawText(g, provider.DisplayName() + (isShown(provider) ? "  · 표시 중" : ""),
                 new RectangleF(x + 32 * scale, y - scale, width - 32 * scale, 28 * scale), 16, foreground, true);
             y = bounds.Y + 60 * scale;
             var snapshot = state.Snapshot;
@@ -258,6 +263,7 @@ namespace CodexUsageBar
             var key = buttons.FirstOrDefault(pair => pair.Value.Contains(e.Location)).Key;
             if (key == "refresh" && RefreshRequested != null) RefreshRequested(this, EventArgs.Empty);
             else if (key == "quit" && QuitRequested != null) QuitRequested(this, EventArgs.Empty);
+            else if (key == "display" && DisplayModeToggled != null) { DisplayModeToggled(this, EventArgs.Empty); Invalidate(); }
             else if (key == "autostart")
             {
                 try { AutoStart.SetEnabled(!AutoStart.IsEnabled); }

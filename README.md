@@ -1,6 +1,6 @@
 # Windows Codex Usage Bar
 
-Windows 작업표시줄에서 Codex와 Claude의 남은 사용량을 표시합니다. 배터리마다 `5h`·`W` 같은 한도 이름을 붙입니다. Claude나 Codex Plus처럼 한도가 여러 개면 한도마다 나란히 그리고, 주간 한도만 있으면 `W` 배터리 하나만 그립니다. 앱 아이콘과 배터리를 누르면 두 계정의 한도 및 초기화 시각을 함께 볼 수 있습니다.
+Windows 작업표시줄에서 Codex와 Claude의 남은 사용량을 표시합니다. 배터리마다 `5h`·`W` 같은 한도 이름을 붙입니다. Claude나 Codex Plus처럼 한도가 여러 개면 한도마다 나란히 그리고, 주간 한도만 있으면 `W` 배터리 하나만 그립니다. 상세 창의 **표시** 버튼으로 앞에 띄운 앱만 보여주는 "자동 전환"과 Codex·Claude를 나란히 보여주는 "둘 다"를 고를 수 있고, 선택은 저장됩니다. 앱 아이콘과 배터리를 누르면 두 계정의 한도 및 초기화 시각을 함께 볼 수 있습니다.
 
 ## 실행과 빌드
 
@@ -27,7 +27,7 @@ Start-Process .\windows\dist\CodexUsageBar.exe
 
 ## Claude: 로그인 토큰으로 직접 조회
 
-- `https://api.anthropic.com/api/oauth/usage`에 GET 요청을 보내 5시간/주간 사용률과 초기화 시각을 읽습니다. 위젯이 Claude를 표시 중이면 **1분마다**, Codex를 표시 중이면 **3분마다** 조회하고, Claude로 전환하거나 상세 창을 열 때는 바로 한 번 조회합니다(20초 이내 재조회는 생략). 모델 추론을 요청하지 않습니다.
+- `https://api.anthropic.com/api/oauth/usage`에 GET 요청을 보내 5시간/주간 사용률과 초기화 시각을 읽습니다. 위젯이 Claude를 표시 중이면(둘 다 표시 포함) **1분마다**, Codex만 표시 중이면 **3분마다** 조회하고, Claude로 전환하거나 상세 창을 열 때는 바로 한 번 조회합니다(20초 이내 재조회는 생략). 모델 추론을 요청하지 않습니다.
 - 이 API는 토큰마다 조회 제한(HTTP 429)이 있고 Claude 앱도 같은 토큰으로 조회하므로 간격을 넉넉히 둡니다.
 - 기본적으로 Claude 데스크톱 앱의 `oauth:tokenCacheV2`를 읽습니다. 일반 설치와 Microsoft Store 설치의 `LocalCache\Roaming\Claude` 경로를 지원하며 Windows DPAPI/CNG로 현재 사용자에게 저장된 토큰을 읽습니다.
 - 데스크톱 프로필이 없으면 Claude Code의 `%USERPROFILE%\.claude\.credentials.json`을 사용합니다. `CLAUDE_CONFIG_DIR`이 있으면 그 경로를 따릅니다. 데스크톱 토큰이 만료되거나 거부됐을 때 다른 계정으로 자동 전환하지 않습니다.
