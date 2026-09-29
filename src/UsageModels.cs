@@ -26,6 +26,20 @@ namespace CodexUsageBar
             get { return Math.Max(0, Math.Min(100, 100 - UsedPercent)); }
         }
 
+        /// 작업표시줄에 쓰는 짧은 이름 (5시간 → "5h", 주간 → "W").
+        public string ShortLabel
+        {
+            get
+            {
+                if (!WindowDurationMinutes.HasValue || WindowDurationMinutes.Value <= 0) return Label;
+                int minutes = WindowDurationMinutes.Value;
+                if (minutes % 10080 == 0) return minutes == 10080 ? "W" : (minutes / 10080) + "W";
+                if (minutes % 1440 == 0) return (minutes / 1440) + "d";
+                if (minutes % 60 == 0) return (minutes / 60) + "h";
+                return minutes + "m";
+            }
+        }
+
         public override bool Equals(object obj)
         {
             var other = obj as UsageWindow;

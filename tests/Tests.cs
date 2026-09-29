@@ -23,6 +23,7 @@ namespace CodexUsageBar
                 var snapshot = ClaudeLiveFetcher.ParseUsage(Payload, now);
                 Check(snapshot.Windows.Count == 2 && snapshot.OverallRemainingPercent == 60, "API percentages");
                 Check(snapshot.Windows[1].RemainingPercent == 60, "weekly remaining");
+                Check(snapshot.Windows[0].ShortLabel == "5h" && snapshot.Windows[1].ShortLabel == "W", "short labels");
                 Check(snapshot.Windows[0].ResetsAt.HasValue && snapshot.Windows[0].ResetsAt.Value.Kind == DateTimeKind.Utc, "fractional ISO reset date");
                 Check(ClaudeLiveFetcher.ParseUsage("{\"five_hour\":{\"utilization\":0},\"seven_day\":null}", now).OverallRemainingPercent == 100, "zero is valid");
                 Expect(() => ClaudeLiveFetcher.ParseUsage("{}", now), "missing windows");
@@ -145,8 +146,16 @@ namespace CodexUsageBar
                         image.Save(Path.Combine(directory, (dark ? "popup-dark" : "popup-light") + suffix + ".png"));
                     }
                 }
-                using (var image = BatteryRenderer.Render(new WidgetContent { Provider = UsageProvider.Claude, RemainingPercent = 75 }, new Size(90, 48), 1f, dark, false))
-                    image.Save(Path.Combine(directory, dark ? "battery-dark.png" : "battery-light.png"));
+                var single = new WidgetContent { Provider = UsageProvider.Codex, Gauges = new List<Gauge> { new Gauge { Label = "W", RemainingPercent = 75 } } };
+                using (var image = BatteryRenderer.Render(single, new Size(BatteryRenderer.Width(renderScale, 1), (int)(48 * renderScale)), renderScale, dark, false))
+                    image.Save(Path.Combine(directory, (dark ? "battery-dark" : "battery-light") + suffix + ".png"));
+                var dual = new WidgetContent
+                {
+                    Provider = UsageProvider.Claude,
+                    Gauges = new List<Gauge> { new Gauge { Label = "5h", RemainingPercent = 63 }, new Gauge { Label = "W", RemainingPercent = 12 } }
+                };
+                using (var image = BatteryRenderer.Render(dual, new Size(BatteryRenderer.Width(renderScale, 2), (int)(48 * renderScale)), renderScale, dark, false))
+                    image.Save(Path.Combine(directory, (dark ? "battery-dual-dark" : "battery-dual-light") + suffix + ".png"));
             }
             Check(true, "UI rendered");
         }

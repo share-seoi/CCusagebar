@@ -148,16 +148,24 @@ namespace CodexUsageBar
         }
     }
 
-    /// 작업표시줄 위젯 한 칸에 그릴 내용.
+    /// 배터리 하나: 한도 이름(5h, W)과 남은 비율.
+    internal sealed class Gauge
+    {
+        public string Label;
+        public int RemainingPercent;
+    }
+
+    /// 작업표시줄 위젯 한 칸에 그릴 내용. 한도가 없으면 "--" 배터리 하나를 그린다.
     internal sealed class WidgetContent
     {
         public UsageProvider Provider;
-        public int? RemainingPercent;
+        public List<Gauge> Gauges = new List<Gauge>();
         public bool Stale;
         public string Tooltip;
     }
 
     /// 작업표시줄에 들어가는 "앱 아이콘 + 배터리" 그림. 투명 배경 위에 알파 채널로 그린다.
+    /// 한도가 여러 개면 "5h [배터리] W [배터리]"처럼 이름을 붙여 나란히 그린다.
     internal static class BatteryRenderer
     {
         private const float PaddingX = 7f;
@@ -167,10 +175,15 @@ namespace CodexUsageBar
         private const float BodyHeight = 18f;
         private const float NubWidth = 2.5f;
         private const float NubGap = 1f;
+        private const float LabelWidth = 14f;
+        private const float LabelGap = 2f;
+        private const float GaugeGap = 7f;
 
-        public static int Width(float scale)
+        public static int Width(float scale, int gaugeCount)
         {
-            return (int)Math.Ceiling((PaddingX + IconSize + Gap + BodyWidth + NubGap + NubWidth + PaddingX) * scale);
+            int count = Math.Max(1, gaugeCount);
+            float gauge = BodyWidth + NubGap + NubWidth + (count > 1 ? LabelWidth + LabelGap : 0f);
+            return (int)Math.Ceiling((PaddingX + IconSize + Gap + gauge * count + GaugeGap * (count - 1) + PaddingX) * scale);
         }
 
         public static Bitmap Render(WidgetContent content, Size size, float scale, bool dark, bool hover)
@@ -233,6 +246,32 @@ namespace CodexUsageBar
             ProviderIcons.Draw(g, content.Provider, dark, new RectangleF(x, centerY - IconSize * scale / 2, IconSize * scale, IconSize * scale));
             x += (IconSize + Gap) * scale;
 
+            if (content.Gauges.Count == 0)
+            {
+                DrawBattery(g, x, centerY, null, scale, dark, foreground);
+                return;
+            }
+
+            bool labeled = content.Gauges.Count > 1;
+            foreach (var gauge in content.Gauges)
+            {
+                if (labeled)
+                {
+                    using (var font = new Font("Segoe UI", 10f * scale, FontStyle.Bold, GraphicsUnit.Pixel))
+                    using (var brush = new SolidBrush(Color.FromArgb(dark ? 200 : 180, foreground)))
+                    using (var format = new StringFormat { Alignment = StringAlignment.Far, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
+                    {
+                        g.DrawString(gauge.Label, font, brush, new RectangleF(x - 4f * scale, centerY - BodyHeight * scale / 2 + 0.5f * scale, (LabelWidth + 4f) * scale, BodyHeight * scale), format);
+                    }
+                    x += (LabelWidth + LabelGap) * scale;
+                }
+                DrawBattery(g, x, centerY, gauge.RemainingPercent, scale, dark, foreground);
+                x += (BodyWidth + NubGap + NubWidth + GaugeGap) * scale;
+            }
+        }
+
+        private static void DrawBattery(Graphics g, float x, float centerY, int? remainingPercent, float scale, bool dark, Color foreground)
+        {
             var body = new RectangleF(x, centerY - BodyHeight * scale / 2, BodyWidth * scale, BodyHeight * scale);
             float stroke = Math.Max(1f, 1.2f * scale);
 
@@ -247,12 +286,12 @@ namespace CodexUsageBar
             // 남은 양만큼 채우기
             var inner = RectangleF.Inflate(body, -2.2f * scale, -2.2f * scale);
             RectangleF fill = RectangleF.Empty;
-            if (content.RemainingPercent.HasValue && content.RemainingPercent.Value > 0)
+            if (remainingPercent.HasValue && remainingPercent.Value > 0)
             {
-                float width = Math.Max(2f * scale, inner.Width * content.RemainingPercent.Value / 100f);
+                float width = Math.Max(2f * scale, inner.Width * remainingPercent.Value / 100f);
                 fill = new RectangleF(inner.X, inner.Y, width, inner.Height);
                 using (var path = RoundedRect(fill, 2f * scale))
-                using (var brush = new SolidBrush(Theme.Level(content.RemainingPercent.Value, dark)))
+                using (var brush = new SolidBrush(Theme.Level(remainingPercent.Value, dark)))
                 {
                     g.FillPath(brush, path);
                 }
@@ -266,8 +305,8 @@ namespace CodexUsageBar
             }
 
             // 퍼센트: 채워진 부분 위는 흰 글자, 빈 부분 위는 기본 글자색으로 나눠 그린다.
-            var text = content.RemainingPercent.HasValue ? content.RemainingPercent.Value + "%" : "--";
-            using (var font = new Font("Segoe UI", (content.RemainingPercent == 100 ? 10f : 11f) * scale, FontStyle.Bold, GraphicsUnit.Pixel))
+            var text = remainingPercent.HasValue ? remainingPercent.Value + "%" : "--";
+            using (var font = new Font("Segoe UI", (remainingPercent == 100 ? 10f : 11f) * scale, FontStyle.Bold, GraphicsUnit.Pixel))
             using (var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center, FormatFlags = StringFormatFlags.NoWrap })
             {
                 var textRect = new RectangleF(body.X, body.Y + 0.5f * scale, body.Width, body.Height);

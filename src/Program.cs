@@ -130,7 +130,10 @@ namespace CodexUsageBar
             }
             widget.SetContent(new WidgetContent
             {
-                Provider = active, RemainingPercent = snapshot == null ? (int?)null : snapshot.OverallRemainingPercent,
+                Provider = active,
+                Gauges = snapshot == null
+                    ? new List<Gauge>()
+                    : snapshot.Windows.Select(window => new Gauge { Label = window.ShortLabel, RemainingPercent = window.RemainingPercent }).ToList(),
                 Stale = state.Health != ConnectionHealth.Ok || snapshot == null || DateTime.UtcNow - snapshot.FetchedAt > TimeSpan.FromMinutes(10),
                 Tooltip = tooltip
             });

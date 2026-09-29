@@ -64,8 +64,11 @@ namespace CodexUsageBar
 
         public void SetContent(WidgetContent newContent)
         {
+            bool widthChanged = newContent.Gauges.Count != content.Gauges.Count;
             content = newContent;
-            Render();
+            // 배터리 개수가 바뀌면 위젯 너비도 바뀌므로 위치를 다시 잡는다.
+            if (widthChanged) UpdateLayout(true);
+            else Render();
             tooltip.SetText(content.Tooltip);
         }
 
@@ -100,7 +103,7 @@ namespace CodexUsageBar
             scale = newScale;
             dark = newDark;
 
-            int width = BatteryRenderer.Width(scale);
+            int width = BatteryRenderer.Width(scale, content.Gauges.Count);
             int height = trayRect.Height;
             int anchorRight = trayRect.Right - (int)(260 * scale);
             var notify = Native.FindWindowEx(tray, IntPtr.Zero, "TrayNotifyWnd", null);
