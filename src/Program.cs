@@ -66,6 +66,13 @@ namespace CodexUsageBar
         private readonly System.Windows.Forms.Timer clockTimer;
         private UsageProvider active;
 
+        // The usage endpoint rate-limits per token (HTTP 429), and the Claude app polls it too.
+        // Poll often only while the widget shows Claude; switching to Claude or opening the
+        // popup still refreshes at once (RefreshLive keeps its own 20-second floor).
+        internal static readonly TimeSpan ClaudeShownInterval = TimeSpan.FromMinutes(1);
+        internal static readonly TimeSpan ClaudeHiddenInterval = TimeSpan.FromMinutes(3);
+        internal static readonly TimeSpan StaleAge = TimeSpan.FromMinutes(10);
+
         public UsageApplicationContext()
         {
             foreach (UsageProvider provider in Enum.GetValues(typeof(UsageProvider)))
@@ -77,7 +84,7 @@ namespace CodexUsageBar
             AddCoordinator(UsageProvider.Codex, new UsageCoordinator(codexLocal.LatestSnapshot, codexLive.FetchSynchronously,
                 "Codex", "Codex 로컬 세션 기록", "Codex 계정 API · 실시간", TimeSpan.FromSeconds(20)));
             AddCoordinator(UsageProvider.Claude, new UsageCoordinator(claudeLocal.LatestSnapshot, claudeLive.FetchSynchronously,
-                "Claude", "Claude 로컬 기록", "Claude 로그인 토큰 API · 실시간", TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(20)));
+                "Claude", "Claude 로컬 기록", "Claude 로그인 토큰 API · 실시간", TimeSpan.FromSeconds(20), ClaudeHiddenInterval));
             active = settings.LastActiveProvider ?? UsageProvider.Codex;
             popup = new DetailsPopup(provider => states[provider], () => active);
             popup.RefreshRequested += delegate { foreach (var coordinator in coordinators.Values) coordinator.RefreshLive(true); };
@@ -92,7 +99,13 @@ namespace CodexUsageBar
                 states[provider].Health = ConnectionHealth.Degraded;
                 UpdateProvider();
             };
-            watcher.Activated += provider => { active = provider; settings.SetLastActiveProvider(provider); UpdateDisplay(); };
+            watcher.Activated += provider =>
+            {
+                active = provider;
+                settings.SetLastActiveProvider(provider);
+                if (provider == UsageProvider.Claude) coordinators[provider].RefreshLive(false);
+                UpdateDisplay();
+            };
             watcher.Start();
             foreach (var provider in watcher.RunningProviders) coordinators[provider].Start(settings.Snapshot(provider));
             UpdateProvider();
@@ -120,6 +133,7 @@ namespace CodexUsageBar
 
         private void UpdateDisplay()
         {
+            coordinators[UsageProvider.Claude].SetLiveInterval(active == UsageProvider.Claude ? ClaudeShownInterval : ClaudeHiddenInterval);
             var state = states[active];
             var snapshot = state.Snapshot;
             var tooltip = active.DisplayName() + " · " + (state.Status ?? "연결 중");
@@ -134,16 +148,24 @@ namespace CodexUsageBar
                 Gauges = snapshot == null
                     ? new List<Gauge>()
                     : snapshot.Windows.Select(window => new Gauge { Label = window.ShortLabel, RemainingPercent = window.RemainingPercent }).ToList(),
-                Stale = state.Health != ConnectionHealth.Ok || snapshot == null || DateTime.UtcNow - snapshot.FetchedAt > TimeSpan.FromMinutes(10),
+                // Fade only when the numbers themselves are old. A failed live request with a
+                // fresh local record keeps full opacity; the popup still shows the error.
+                Stale = IsStale(snapshot, DateTime.UtcNow),
                 Tooltip = tooltip
             });
             if (popup != null) popup.Refresh(true);
+        }
+
+        internal static bool IsStale(UsageSnapshot snapshot, DateTime now)
+        {
+            return snapshot == null || now - snapshot.FetchedAt > StaleAge;
         }
 
         private void TogglePopup()
         {
             widget.HideTooltip();
             if (popup.Visible) { popup.Hide(); return; }
+            coordinators[UsageProvider.Claude].RefreshLive(false);
             if (!popup.ClosedJustNow) popup.ShowAbove(widget.ScreenBounds, widget.Scale, widget.IsDark);
         }
 

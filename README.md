@@ -27,13 +27,15 @@ Start-Process .\windows\dist\CodexUsageBar.exe
 
 ## Claude: 로그인 토큰으로 직접 조회
 
-- **20초마다** `https://api.anthropic.com/api/oauth/usage`에 GET 요청을 보내 5시간/주간 사용률과 초기화 시각을 읽습니다. 모델 추론을 요청하지 않습니다.
+- `https://api.anthropic.com/api/oauth/usage`에 GET 요청을 보내 5시간/주간 사용률과 초기화 시각을 읽습니다. 위젯이 Claude를 표시 중이면 **1분마다**, Codex를 표시 중이면 **3분마다** 조회하고, Claude로 전환하거나 상세 창을 열 때는 바로 한 번 조회합니다(20초 이내 재조회는 생략). 모델 추론을 요청하지 않습니다.
+- 이 API는 토큰마다 조회 제한(HTTP 429)이 있고 Claude 앱도 같은 토큰으로 조회하므로 간격을 넉넉히 둡니다.
 - 기본적으로 Claude 데스크톱 앱의 `oauth:tokenCacheV2`를 읽습니다. 일반 설치와 Microsoft Store 설치의 `LocalCache\Roaming\Claude` 경로를 지원하며 Windows DPAPI/CNG로 현재 사용자에게 저장된 토큰을 읽습니다.
 - 데스크톱 프로필이 없으면 Claude Code의 `%USERPROFILE%\.claude\.credentials.json`을 사용합니다. `CLAUDE_CONFIG_DIR`이 있으면 그 경로를 따릅니다. 데스크톱 토큰이 만료되거나 거부됐을 때 다른 계정으로 자동 전환하지 않습니다.
 - 고급 설정으로 `CLAUDE_USAGE_ACCESS_TOKEN` 환경 변수를 지정하면 해당 토큰을 우선 사용합니다. 토큰을 명령행 인수나 로그에 넣지 마세요.
 - 로그인 정보와 refresh token을 수정하지 않으며, 토큰을 별도 파일에 복사하지 않습니다. 각 조회마다 원본에서 다시 읽으므로 Claude가 갱신한 토큰을 반영합니다.
 - HTTP 429에서는 `Retry-After`를 존중하며, 헤더가 없으면 2분부터 최대 15분까지 재시도 간격을 늘립니다. 수동 새로고침도 제한을 우회하지 않습니다.
-- API 조회가 실패하면 마지막으로 받은 값이나 로컬 사용량 기록을 유지하고, 인증/네트워크 오류와 데이터 시각을 표시합니다. 오래된 로컬 기록을 사용량 0%로 바꾸지 않습니다.
+- API 조회가 실패하면 마지막으로 받은 값이나 로컬 사용량 기록을 유지하고, 상세 창에 인증/네트워크 오류와 데이터 시각을 표시합니다. 오래된 로컬 기록을 사용량 0%로 바꾸지 않습니다.
+- 작업표시줄 배터리는 표시 중인 값이 **10분보다 오래됐을 때만** 흐리게 표시합니다. 조회가 실패해도 Claude 앱의 로컬 기록이 최근이면 선명하게 유지합니다.
 - 사용량 API는 공개적으로 안정성을 보장하는 API가 아니므로 응답/인증 형식이 바뀔 수 있습니다. 관련 자료: [Claude Code 인증 정보 저장 위치](https://code.claude.com/docs/en/authentication#credential-management), [Anthropic 저장소의 사용량 API 429 보고](https://github.com/anthropics/claude-code/issues/31021).
 
 ## Codex
@@ -50,7 +52,7 @@ Start-Process .\windows\dist\CodexUsageBar.exe
 powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\test.ps1
 ```
 
-테스트는 합성 토큰을 사용하며 네트워크를 호출하지 않습니다. 응답 해석, 토큰 만료, 20초 간격, HTTP 오류/재시도 제한, 실패 후 상태 표시, 앱 감지, UI 렌더링을 확인합니다. 렌더 결과는 `windows\test-output`에 저장됩니다.
+테스트는 합성 토큰을 사용하며 네트워크를 호출하지 않습니다. 응답 해석, 토큰 만료, 조회 간격, 흐림 표시 기준, HTTP 오류/재시도 제한, 실패 후 상태 표시, 앱 감지, UI 렌더링을 확인합니다. 렌더 결과는 `windows\test-output`에 저장됩니다.
 
 실제 사용량 진단은 다음 옵션을 사용합니다. GUI 실행 파일이므로 PowerShell에서는 출력을 리디렉션하고 종료를 기다립니다.
 

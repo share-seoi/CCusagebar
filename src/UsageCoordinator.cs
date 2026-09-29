@@ -69,7 +69,7 @@ namespace CodexUsageBar
         private bool scanning;
         private bool started;
         private bool restoredCache;
-        private readonly TimeSpan? liveInterval;
+        private TimeSpan? liveInterval;
         private readonly TimeSpan localInterval;
         private DateTime lastLocalAttempt = DateTime.MinValue;
         private DateTime lastLiveAttempt = DateTime.MinValue;
@@ -101,6 +101,12 @@ namespace CodexUsageBar
                 if (liveInterval.HasValue && DateTime.UtcNow - lastLiveAttempt >= liveInterval.Value)
                     RefreshLive(false);
             };
+        }
+
+        /// 실시간 자동 조회 간격을 바꾼다. null이면 시작·수동 새로고침 때만 조회한다.
+        public void SetLiveInterval(TimeSpan? interval)
+        {
+            liveInterval = interval;
         }
 
         public bool IsStarted

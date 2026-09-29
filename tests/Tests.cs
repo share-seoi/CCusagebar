@@ -35,6 +35,10 @@ namespace CodexUsageBar
                 Check(credentials.AccessToken == "synthetic-token" && credentials.ExpiresAt.HasValue, "Code credentials parsed");
                 Check(ClaudeLiveFetcher.ParseCodeCredentials("{}") == null, "missing credentials");
                 Check(new ClaudeToken("synthetic", now.AddSeconds(59), "test").IsExpired(now), "expiry margin");
+                Check(!UsageApplicationContext.IsStale(new UsageSnapshot(snapshot.Windows, null, now.AddMinutes(-3)), now), "3-minute-old record stays opaque despite API failure");
+                Check(UsageApplicationContext.IsStale(new UsageSnapshot(snapshot.Windows, null, now.AddMinutes(-11)), now), "11-minute-old record fades");
+                Check(UsageApplicationContext.IsStale(null, now), "missing record fades");
+                Check(UsageApplicationContext.ClaudeShownInterval == TimeSpan.FromMinutes(1) && UsageApplicationContext.ClaudeHiddenInterval == TimeSpan.FromMinutes(3), "Claude poll intervals");
 
                 int calls = 0, reads = 0;
                 var fakeResponse = new ClaudeUsageResponse { StatusCode = 200, Body = Payload };
