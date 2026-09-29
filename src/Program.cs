@@ -75,6 +75,8 @@ namespace CodexUsageBar
         // Codex has no periodic live lookup (each one starts a helper process); switching to
         // Codex refreshes it instead, at most once a minute so alt-tabbing stays cheap.
         internal static readonly TimeSpan CodexSwitchRefreshAge = TimeSpan.FromMinutes(1);
+        // Codex 앱이 꺼져 있어도 Claude에서 부른 Codex CLI 등이 로컬 기록을 남기므로 이 간격으로 확인한다.
+        internal static readonly TimeSpan CodexClosedLocalInterval = TimeSpan.FromMinutes(1);
 
         public UsageApplicationContext()
         {
@@ -95,12 +97,13 @@ namespace CodexUsageBar
             popup.QuitRequested += delegate { ExitThread(); };
             widget.LeftClick += delegate { TogglePopup(); };
             widget.RightClick += delegate { TogglePopup(); };
-            watcher.Launched += provider => { coordinators[provider].Start(settings.Snapshot(provider)); UpdateProvider(); };
+            watcher.Launched += provider => { coordinators[provider].Start(settings.Snapshot(provider)); SyncClosedCodex(); UpdateProvider(); };
             watcher.Terminated += provider =>
             {
                 coordinators[provider].Stop();
                 states[provider].Status = "앱 종료됨 · 마지막 기록 표시";
                 states[provider].Health = ConnectionHealth.Degraded;
+                SyncClosedCodex();
                 UpdateProvider();
             };
             watcher.Activated += provider =>
@@ -113,6 +116,7 @@ namespace CodexUsageBar
             };
             watcher.Start();
             foreach (var provider in watcher.RunningProviders) coordinators[provider].Start(settings.Snapshot(provider));
+            SyncClosedCodex();
             UpdateProvider();
             clockTimer = new System.Windows.Forms.Timer { Interval = 30000 };
             clockTimer.Tick += delegate { UpdateDisplay(); };
@@ -125,6 +129,17 @@ namespace CodexUsageBar
             coordinator.SnapshotChanged += snapshot => { states[provider].Snapshot = snapshot; settings.SetSnapshot(provider, snapshot); UpdateDisplay(); };
             coordinator.Checked += at => { states[provider].CheckedAt = at; };
             coordinator.StatusChanged += (status, health) => { states[provider].Status = status; states[provider].Health = health; UpdateDisplay(); };
+        }
+
+        /// Codex 앱이 꺼져 있어도 Claude 앱이 켜져 있으면(Claude에서 Codex CLI를 부르는 경우)
+        /// 로컬 기록만 1분마다 확인한다. 두 앱이 모두 꺼지면 아무것도 조회하지 않는다.
+        private void SyncClosedCodex()
+        {
+            var running = watcher.RunningProviders.ToList();
+            if (running.Contains(UsageProvider.Codex)) return;
+            var codex = coordinators[UsageProvider.Codex];
+            if (running.Contains(UsageProvider.Claude)) codex.StartBackground(settings.Snapshot(UsageProvider.Codex), CodexClosedLocalInterval);
+            else codex.Stop();
         }
 
         private void UpdateProvider()

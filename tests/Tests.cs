@@ -141,6 +141,23 @@ namespace CodexUsageBar
                 Check(codexCalls == 1, "switching back within a minute does not start another Codex lookup");
                 coordinator.Stop();
             }
+            int closedCalls = 0;
+            var closedStatuses = new List<string>();
+            using (var coordinator = new UsageCoordinator(() => snapshot,
+                () => { Interlocked.Increment(ref closedCalls); return snapshot; }, "Test", "local", "live", TimeSpan.FromSeconds(10)))
+            {
+                coordinator.StatusChanged += (status, health) => closedStatuses.Add(status);
+                coordinator.StartBackground(null, TimeSpan.FromMinutes(1));
+                PumpUntil(() => closedStatuses.Any(status => status == "local · 앱 꺼짐 · 1분마다 확인"));
+                coordinator.RefreshLive(true);
+                coordinator.RefreshLiveIfOlderThan(TimeSpan.Zero);
+                Pump(150);
+                Check(closedCalls == 0 && coordinator.IsBackground, "closed app reads local history only");
+                coordinator.Start(null);
+                PumpUntil(() => closedCalls == 1);
+                Check(!coordinator.IsBackground, "launching the app resumes live lookups");
+                coordinator.Stop();
+            }
             using (var release = new ManualResetEvent(false))
             using (var coordinator = new UsageCoordinator(() => null,
                 () => { release.WaitOne(2000); return snapshot; }, "Test", "local", "live", TimeSpan.FromSeconds(10)))

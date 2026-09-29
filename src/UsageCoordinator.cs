@@ -70,7 +70,10 @@ namespace CodexUsageBar
         private bool started;
         private bool restoredCache;
         private TimeSpan? liveInterval;
-        private readonly TimeSpan localInterval;
+        private readonly TimeSpan normalLocalInterval;
+        private TimeSpan localInterval;
+        // 앱이 꺼져 있을 때: 로컬 기록만 느리게 확인하고 실시간 조회는 하지 않는다.
+        private bool backgroundOnly;
         private DateTime lastLocalAttempt = DateTime.MinValue;
         private DateTime lastLiveAttempt = DateTime.MinValue;
         private string liveError;
@@ -91,6 +94,7 @@ namespace CodexUsageBar
             this.localStatus = localStatus;
             this.liveSuccessStatus = liveSuccessStatus;
             this.liveInterval = liveInterval;
+            this.normalLocalInterval = pollInterval;
             this.localInterval = pollInterval;
             // Check deadlines each second so a few milliseconds of timer jitter do not
             // skip an entire 20-second refresh period. File/API work still runs every 20s.
@@ -98,7 +102,7 @@ namespace CodexUsageBar
             pollTimer.Tick += delegate
             {
                 if (DateTime.UtcNow - lastLocalAttempt >= localInterval) ScanLocal();
-                if (liveInterval.HasValue && DateTime.UtcNow - lastLiveAttempt >= liveInterval.Value)
+                if (!backgroundOnly && liveInterval.HasValue && DateTime.UtcNow - lastLiveAttempt >= liveInterval.Value)
                     RefreshLive(false);
             };
         }
@@ -116,7 +120,48 @@ namespace CodexUsageBar
 
         public void Start(UsageSnapshot cached)
         {
-            if (started) return;
+            if (started)
+            {
+                if (!backgroundOnly) return;
+                // 꺼져 있던 앱이 켜졌다: 로컬 확인 간격을 되돌리고 실시간 조회를 재개한다.
+                backgroundOnly = false;
+                localInterval = normalLocalInterval;
+                ScanLocal();
+                if (fetchLive != null) RefreshLive(false);
+                return;
+            }
+            StartPolling(cached);
+            if (fetchLive != null)
+            {
+                RefreshLive(false);
+            }
+        }
+
+        /// 앱은 꺼져 있지만 다른 경로(예: Claude에서 부른 Codex CLI)로 쓰일 수 있을 때.
+        /// 프로세스나 네트워크 없이 로컬 기록만 interval마다 확인한다.
+        public void StartBackground(UsageSnapshot cached, TimeSpan interval)
+        {
+            backgroundOnly = true;
+            localInterval = interval;
+            // 실시간 값 대신 로컬 기록 상태가 보이게 한다.
+            liveHealthy = false;
+            liveRefreshInProgress = false;
+            generation++;
+            if (started)
+            {
+                ScanLocal();
+                return;
+            }
+            StartPolling(cached);
+        }
+
+        public bool IsBackground
+        {
+            get { return started && backgroundOnly; }
+        }
+
+        private void StartPolling(UsageSnapshot cached)
+        {
             started = true;
             generation++;
             uiScheduler = TaskScheduler.FromCurrentSynchronizationContext();
@@ -130,16 +175,14 @@ namespace CodexUsageBar
 
             pollTimer.Start();
             ScanLocal();
-            if (fetchLive != null)
-            {
-                RefreshLive(false);
-            }
         }
 
         public void Stop()
         {
             if (!started) return;
             started = false;
+            backgroundOnly = false;
+            localInterval = normalLocalInterval;
             generation++;
             liveRefreshInProgress = false;
             scanning = false;
@@ -155,7 +198,7 @@ namespace CodexUsageBar
         public void RefreshLive(bool isManual)
         {
             if (!started) return;
-            if (fetchLive == null)
+            if (fetchLive == null || backgroundOnly)
             {
                 ScanLocal();
                 return;
@@ -231,10 +274,17 @@ namespace CodexUsageBar
                 if (showLocalStatus)
                 {
                     RaiseChecked(task.Result.FetchedAt);
-                    RaiseStatus(liveError == null ? localStatus : liveError + " · 마지막 기록 표시",
+                    RaiseStatus(liveError == null ? LocalStatus() : liveError + " · 마지막 기록 표시",
                         liveError == null ? ConnectionHealth.Ok : ConnectionHealth.Degraded);
                 }
             }, uiScheduler);
+        }
+
+        private string LocalStatus()
+        {
+            if (!backgroundOnly) return localStatus;
+            var minutes = (int)Math.Round(localInterval.TotalMinutes);
+            return localStatus + " · 앱 꺼짐 · " + (minutes >= 1 ? minutes + "분" : (int)localInterval.TotalSeconds + "초") + "마다 확인";
         }
 
         private void ApplyLocal(UsageSnapshot snapshot)
