@@ -103,7 +103,7 @@ namespace CodexUsageBar
             scale = newScale;
             dark = newDark;
 
-            int width = BatteryRenderer.Width(scale, content.Gauges.Count);
+            int width = BatteryRenderer.Width(scale, content.Gauges);
             int height = trayRect.Height;
             int anchorRight = trayRect.Right - (int)(260 * scale);
             var notify = Native.FindWindowEx(tray, IntPtr.Zero, "TrayNotifyWnd", null);

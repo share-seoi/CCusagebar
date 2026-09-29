@@ -38,6 +38,20 @@ namespace CodexUsageBar
                 Check(!UsageApplicationContext.IsStale(new UsageSnapshot(snapshot.Windows, null, now.AddMinutes(-3)), now), "3-minute-old record stays opaque despite API failure");
                 Check(UsageApplicationContext.IsStale(new UsageSnapshot(snapshot.Windows, null, now.AddMinutes(-11)), now), "11-minute-old record fades");
                 Check(UsageApplicationContext.IsStale(null, now), "missing record fades");
+                // Fabricated Codex payloads: Plus returns 5h + weekly, weekly-only accounts return one window.
+                var plusLive = RateLimitParser.ParseResponseObject((Dictionary<string, object>)Json.TryParse(
+                    "{\"result\":{\"rateLimits\":{\"primary\":{\"usedPercent\":30,\"windowDurationMins\":300,\"resetsAt\":1893499200},\"secondary\":{\"usedPercent\":10,\"windowDurationMins\":10080,\"resetsAt\":1894000000}}}}"), now);
+                Check(string.Join(",", plusLive.Windows.Select(w => w.ShortLabel + w.RemainingPercent)) == "5h70,W90", "Codex Plus live shows 5h and W");
+                var weeklyLive = RateLimitParser.ParseResponseObject((Dictionary<string, object>)Json.TryParse(
+                    "{\"result\":{\"rateLimits\":{\"primary\":{\"usedPercent\":4,\"windowDurationMins\":10080,\"resetsAt\":1894000000}}}}"), now);
+                Check(weeklyLive.Windows.Count == 1 && weeklyLive.Windows[0].ShortLabel == "W", "weekly-only Codex account gets one W battery");
+                var plusLocal = RateLimitParser.ParseSessionEventLine(
+                    "{\"timestamp\":\"2030-01-01T12:00:00Z\",\"payload\":{\"type\":\"token_count\",\"rate_limits\":{\"primary\":{\"used_percent\":30,\"window_minutes\":300,\"resets_at\":1893499200},\"secondary\":{\"used_percent\":10,\"window_minutes\":10080,\"resets_at\":1894000000}}}}");
+                Check(string.Join(",", plusLocal.Windows.Select(w => w.ShortLabel)) == "5h,W", "Codex Plus session record shows 5h and W");
+                var weekly = new List<Gauge> { new Gauge { Label = "W", RemainingPercent = 96 } };
+                var unlabeled = new List<Gauge> { new Gauge { Label = "개인 한도", RemainingPercent = 96 } };
+                Check(BatteryRenderer.Width(1f, weekly) > BatteryRenderer.Width(1f, unlabeled), "single weekly battery reserves room for its W label");
+                Check(BatteryRenderer.Width(1f, new List<Gauge>()) == BatteryRenderer.Width(1f, unlabeled), "empty widget has no label space");
                 Check(UsageApplicationContext.ClaudeShownInterval == TimeSpan.FromMinutes(1) && UsageApplicationContext.ClaudeHiddenInterval == TimeSpan.FromMinutes(3), "Claude poll intervals");
 
                 int calls = 0, reads = 0;
@@ -151,14 +165,14 @@ namespace CodexUsageBar
                     }
                 }
                 var single = new WidgetContent { Provider = UsageProvider.Codex, Gauges = new List<Gauge> { new Gauge { Label = "W", RemainingPercent = 75 } } };
-                using (var image = BatteryRenderer.Render(single, new Size(BatteryRenderer.Width(renderScale, 1), (int)(48 * renderScale)), renderScale, dark, false))
+                using (var image = BatteryRenderer.Render(single, new Size(BatteryRenderer.Width(renderScale, single.Gauges), (int)(48 * renderScale)), renderScale, dark, false))
                     image.Save(Path.Combine(directory, (dark ? "battery-dark" : "battery-light") + suffix + ".png"));
                 var dual = new WidgetContent
                 {
                     Provider = UsageProvider.Claude,
                     Gauges = new List<Gauge> { new Gauge { Label = "5h", RemainingPercent = 63 }, new Gauge { Label = "W", RemainingPercent = 12 } }
                 };
-                using (var image = BatteryRenderer.Render(dual, new Size(BatteryRenderer.Width(renderScale, 2), (int)(48 * renderScale)), renderScale, dark, false))
+                using (var image = BatteryRenderer.Render(dual, new Size(BatteryRenderer.Width(renderScale, dual.Gauges), (int)(48 * renderScale)), renderScale, dark, false))
                     image.Save(Path.Combine(directory, (dark ? "battery-dual-dark" : "battery-dual-light") + suffix + ".png"));
             }
             Check(true, "UI rendered");

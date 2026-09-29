@@ -179,11 +179,19 @@ namespace CodexUsageBar
         private const float LabelGap = 2f;
         private const float GaugeGap = 7f;
 
-        public static int Width(float scale, int gaugeCount)
+        public static int Width(float scale, IList<Gauge> gauges)
         {
-            int count = Math.Max(1, gaugeCount);
-            float gauge = BodyWidth + NubGap + NubWidth + (count > 1 ? LabelWidth + LabelGap : 0f);
-            return (int)Math.Ceiling((PaddingX + IconSize + Gap + gauge * count + GaugeGap * (count - 1) + PaddingX) * scale);
+            int count = Math.Max(1, gauges.Count);
+            float width = (BodyWidth + NubGap + NubWidth) * count + GaugeGap * (count - 1);
+            width += gauges.Count(HasLabel) * (LabelWidth + LabelGap);
+            return (int)Math.Ceiling((PaddingX + IconSize + Gap + width + PaddingX) * scale);
+        }
+
+        // Label every battery, even a lone one, so a weekly-only account reads "W 96%"
+        // like Claude's "5h … W …". Long fallback names ("개인 한도") do not fit and stay unlabeled.
+        private static bool HasLabel(Gauge gauge)
+        {
+            return !string.IsNullOrEmpty(gauge.Label) && gauge.Label.Length <= 3;
         }
 
         public static Bitmap Render(WidgetContent content, Size size, float scale, bool dark, bool hover)
@@ -252,10 +260,9 @@ namespace CodexUsageBar
                 return;
             }
 
-            bool labeled = content.Gauges.Count > 1;
             foreach (var gauge in content.Gauges)
             {
-                if (labeled)
+                if (HasLabel(gauge))
                 {
                     using (var font = new Font("Segoe UI", 10f * scale, FontStyle.Bold, GraphicsUnit.Pixel))
                     using (var brush = new SolidBrush(Color.FromArgb(dark ? 200 : 180, foreground)))
