@@ -72,6 +72,9 @@ namespace CodexUsageBar
         internal static readonly TimeSpan ClaudeShownInterval = TimeSpan.FromMinutes(1);
         internal static readonly TimeSpan ClaudeHiddenInterval = TimeSpan.FromMinutes(3);
         internal static readonly TimeSpan StaleAge = TimeSpan.FromMinutes(10);
+        // Codex has no periodic live lookup (each one starts a helper process); switching to
+        // Codex refreshes it instead, at most once a minute so alt-tabbing stays cheap.
+        internal static readonly TimeSpan CodexSwitchRefreshAge = TimeSpan.FromMinutes(1);
 
         public UsageApplicationContext()
         {
@@ -82,9 +85,9 @@ namespace CodexUsageBar
             var claudeLocal = new ClaudeUsageStore();
             var claudeLive = new ClaudeLiveFetcher();
             AddCoordinator(UsageProvider.Codex, new UsageCoordinator(codexLocal.LatestSnapshot, codexLive.FetchSynchronously,
-                "Codex", "Codex 로컬 세션 기록", "Codex 계정 API · 실시간", TimeSpan.FromSeconds(20)));
+                "Codex", "Codex 로컬 세션 기록", "Codex 계정 API", TimeSpan.FromSeconds(20)));
             AddCoordinator(UsageProvider.Claude, new UsageCoordinator(claudeLocal.LatestSnapshot, claudeLive.FetchSynchronously,
-                "Claude", "Claude 로컬 기록", "Claude 로그인 토큰 API · 실시간", TimeSpan.FromSeconds(20), ClaudeHiddenInterval));
+                "Claude", "Claude 로컬 기록", "Claude 계정 API", TimeSpan.FromSeconds(20), ClaudeHiddenInterval));
             active = settings.LastActiveProvider ?? UsageProvider.Codex;
             popup = new DetailsPopup(provider => states[provider], IsShown, () => settings.ShowBoth);
             popup.DisplayModeToggled += delegate { settings.SetShowBoth(!settings.ShowBoth); UpdateDisplay(); };
@@ -105,6 +108,7 @@ namespace CodexUsageBar
                 active = provider;
                 settings.SetLastActiveProvider(provider);
                 if (provider == UsageProvider.Claude) coordinators[provider].RefreshLive(false);
+                else coordinators[provider].RefreshLiveIfOlderThan(CodexSwitchRefreshAge);
                 UpdateDisplay();
             };
             watcher.Start();

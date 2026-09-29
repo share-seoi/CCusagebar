@@ -41,7 +41,7 @@ Start-Process .\windows\dist\CodexUsageBar.exe
 ## Codex
 
 - 로컬 세션의 사용량 기록을 **20초마다** 확인합니다.
-- 앱 시작 또는 **새로고침**에서는 Codex App Server의 `account/rateLimits/read`로 실시간 계정 한도를 조회하고 조회용 프로세스를 종료합니다.
+- 앱 시작, **새로고침**, Codex로 전환할 때(마지막 조회 후 1분이 지났을 때만)는 Codex App Server의 `account/rateLimits/read`로 실시간 계정 한도를 조회하고 조회용 프로세스를 종료합니다.
 - 현재 Store 버전의 `OpenAI.Codex_*\app\ChatGPT.exe`와 이전 `Codex.exe`를 감지합니다. 일반 ChatGPT 앱이나 CLI만 실행된 경우는 제외합니다.
 - 새 버전의 `%LOCALAPPDATA%\OpenAI\Codex\bin\<version>\codex.exe` 조회 경로도 지원합니다.
 - 서버가 제공한 한도만 표시합니다. 주간 한도만 반환되는 계정에 5시간 한도를 임의로 추가하지 않습니다.

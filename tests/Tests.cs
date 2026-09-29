@@ -127,6 +127,20 @@ namespace CodexUsageBar
                 Check(statuses.Last().Contains("synthetic auth failure") && statuses.Last().EndsWith("Degraded"), "local poll preserves API failure");
                 coordinator.Stop();
             }
+            int codexCalls = 0;
+            var codexStatuses = new List<string>();
+            using (var coordinator = new UsageCoordinator(() => null,
+                () => { Interlocked.Increment(ref codexCalls); return snapshot; }, "Test", "local", "Codex 계정 API", TimeSpan.FromSeconds(10)))
+            {
+                coordinator.StatusChanged += (status, health) => codexStatuses.Add(status + ":" + health);
+                coordinator.Start(null);
+                PumpUntil(() => codexStatuses.Any(status => status.EndsWith("Ok")));
+                Check(codexStatuses.Last().StartsWith("Codex 계정 API · 마지막 조회 ") && codexStatuses.Last().EndsWith(":Ok"), "live success shows its lookup time");
+                coordinator.RefreshLiveIfOlderThan(TimeSpan.FromMinutes(1));
+                Pump(150);
+                Check(codexCalls == 1, "switching back within a minute does not start another Codex lookup");
+                coordinator.Stop();
+            }
             using (var release = new ManualResetEvent(false))
             using (var coordinator = new UsageCoordinator(() => null,
                 () => { release.WaitOne(2000); return snapshot; }, "Test", "local", "live", TimeSpan.FromSeconds(10)))
@@ -143,15 +157,15 @@ namespace CodexUsageBar
 
         private static void RenderPopup(UsageSnapshot snapshot, string directory)
         {
-            var claudeState = new ProviderUsageState { Snapshot = snapshot, Status = "Claude 로그인 토큰 API · 실시간", Health = ConnectionHealth.Ok };
+            var claudeState = new ProviderUsageState { Snapshot = snapshot, Status = "Claude 계정 API · 마지막 조회 오후 8:01:05", Health = ConnectionHealth.Ok };
             var codexState = new ProviderUsageState {
                 Snapshot = new UsageSnapshot(new List<UsageWindow> { new UsageWindow("주간 한도", 20, 10080, DateTime.UtcNow.AddDays(5)) }, "test-plan", DateTime.UtcNow),
-                Status = "Codex 계정 API · 실시간", Health = ConnectionHealth.Ok };
+                Status = "Codex 계정 API · 마지막 조회 오후 7:29:42", Health = ConnectionHealth.Ok };
             foreach (var dark in new[] { false, true })
             foreach (var renderScale in new[] { 1f, 1.25f, 1.5f, 2f })
             foreach (var error in new[] { false, true })
             {
-                claudeState.Status = error ? "Claude 토큰 인증 실패 (HTTP 401) · Claude 앱 로그인 확인 필요 · 마지막 기록 표시" : "Claude 로그인 토큰 API · 실시간";
+                claudeState.Status = error ? "Claude 토큰 인증 실패 (HTTP 401) · Claude 앱 로그인 확인 필요 · 마지막 기록 표시" : "Claude 계정 API · 마지막 조회 오후 8:01:05";
                 claudeState.Health = error ? ConnectionHealth.Degraded : ConnectionHealth.Ok;
                 var suffix = (renderScale == 1f ? "" : "-" + (int)(renderScale * 100)) + (error ? "-error" : "");
                 using (var popup = new DetailsPopup(provider => provider == UsageProvider.Claude ? claudeState : codexState, provider => provider == UsageProvider.Codex, () => false))

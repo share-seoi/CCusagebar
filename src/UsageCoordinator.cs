@@ -189,8 +189,16 @@ namespace CodexUsageBar
                 liveError = null;
                 ApplyLive(task.Result);
                 RaiseChecked(task.Result.FetchedAt);
-                RaiseStatus(liveSuccessStatus, ConnectionHealth.Ok);
+                // The status stays on screen until the next lookup, so say when this one happened.
+                RaiseStatus(liveSuccessStatus + " · 마지막 조회 " + UsageFormat.Time(DateTime.UtcNow), ConnectionHealth.Ok);
             }, uiScheduler);
+        }
+
+        /// 마지막 실시간 조회가 maxAge보다 오래됐을 때만 조회한다(앱 전환처럼 자주 불리는 곳용).
+        public void RefreshLiveIfOlderThan(TimeSpan maxAge)
+        {
+            if (DateTime.UtcNow - lastLiveAttempt < maxAge) return;
+            RefreshLive(false);
         }
 
         private void ScanLocal()
