@@ -85,7 +85,7 @@ namespace CodexUsageBar
                                     { "clientInfo", new Dictionary<string, object>
                                         {
                                             { "name", "codex_usage_bar" },
-                                            { "title", "Codex Usage Bar" },
+                                            { "title", AppInfo.Name },
                                             { "version", "1.2.0-windows" }
                                         }
                                     }

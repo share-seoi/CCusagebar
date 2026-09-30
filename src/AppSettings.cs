@@ -6,7 +6,7 @@ using Microsoft.Win32;
 
 namespace CodexUsageBar
 {
-    /// 마지막으로 표시한 앱, "둘 다 표시" 여부, 마지막 스냅샷을 %LOCALAPPDATA%\CodexUsageBar\state.json에 저장한다.
+    /// 마지막으로 표시한 앱, "둘 다 표시" 여부, 마지막 스냅샷을 %LOCALAPPDATA%\CCusagebar\state.json에 저장한다.
     internal sealed class AppSettings
     {
         private readonly string path;
@@ -17,10 +17,7 @@ namespace CodexUsageBar
 
         private AppSettings()
         {
-            path = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "CodexUsageBar",
-                "state.json");
+            path = Path.Combine(AppInfo.DataDirectory, "state.json");
         }
 
         public static AppSettings Load()
@@ -109,7 +106,7 @@ namespace CodexUsageBar
     internal static class AutoStart
     {
         private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        private const string ValueName = "CodexUsageBar";
+        private const string ValueName = AppInfo.Name;
 
         public static bool IsEnabled
         {

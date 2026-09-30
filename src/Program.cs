@@ -41,16 +41,43 @@ namespace CodexUsageBar
                 }
             }
 
-            bool created;
-            using (var mutex = new Mutex(true, @"Local\CodexUsageBar.Windows", out created))
+            AppInfo.MigrateLegacyData();
+            // 부팅 후 경과 시간으로 로그인 자동 실행인지 수동 실행인지 가늠한다.
+            Log.Write("시작 · " + Application.ExecutablePath + " · 부팅 후 " + (Environment.TickCount / 1000) + "초"
+                + (args.Length > 0 ? " · " + string.Join(" ", args) : ""));
+            int delaySeconds;
+            if (args.Length == 2 && args[0] == SessionWatcher.DelayedStartArgument
+                && int.TryParse(args[1], out delaySeconds) && delaySeconds > 0 && delaySeconds <= 600)
             {
-                if (!created) return 0;
+                // 다른 앱 업데이트로 닫힌 뒤 다시 켜지는 경우: 업데이트가 끝나도록 잠시 기다린다.
+                Thread.Sleep(TimeSpan.FromSeconds(delaySeconds));
+            }
+            AppDomain.CurrentDomain.UnhandledException += (sender, e) =>
+                Log.Error("처리되지 않은 예외(프로세스 종료)", e.ExceptionObject as Exception);
+
+            bool created;
+            using (var mutex = new Mutex(true, @"Local\CCusagebar.Windows", out created))
+            {
+                if (!created)
+                {
+                    // 인수 없이 직접 실행(바로가기)했으면 켜진 위젯을 끈다. 자동 재실행 예약은 건드리지 않는다.
+                    if (args.Length == 0 && SessionWatcher.RequestQuitOfRunningInstance())
+                        Log.Write("이미 실행 중인 위젯에 종료 요청");
+                    else
+                        Log.Write("이미 실행 중인 위젯이 있어 종료");
+                    return 0;
+                }
+                // UI 스레드 오류는 .NET 기본 오류 창 대신 기록만 남기고 계속 실행한다.
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.ThreadException += (sender, e) => Log.Error("UI 스레드 예외", e.Exception);
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
+                using (new SessionWatcher())
                 using (var context = new UsageApplicationContext()) Application.Run(context);
                 mutex.ReleaseMutex();
             }
+            Log.Write("정상 종료");
             return 0;
         }
     }
@@ -94,12 +121,19 @@ namespace CodexUsageBar
             popup = new DetailsPopup(provider => states[provider], IsShown, () => settings.ShowBoth);
             popup.DisplayModeToggled += delegate { settings.SetShowBoth(!settings.ShowBoth); UpdateDisplay(); };
             popup.RefreshRequested += delegate { foreach (var coordinator in coordinators.Values) coordinator.RefreshLive(true); };
-            popup.QuitRequested += delegate { ExitThread(); };
+            popup.QuitRequested += delegate { Log.Write("상세 창에서 종료 요청"); ExitThread(); };
             widget.LeftClick += delegate { TogglePopup(); };
             widget.RightClick += delegate { TogglePopup(); };
-            watcher.Launched += provider => { coordinators[provider].Start(settings.Snapshot(provider)); SyncClosedCodex(); UpdateProvider(); };
+            watcher.Launched += provider =>
+            {
+                Log.Write(provider.DisplayName() + " 앱 실행 감지");
+                coordinators[provider].Start(settings.Snapshot(provider));
+                SyncClosedCodex();
+                UpdateProvider();
+            };
             watcher.Terminated += provider =>
             {
+                Log.Write(provider.DisplayName() + " 앱 종료 감지");
                 coordinators[provider].Stop();
                 states[provider].Status = "앱 종료됨 · 마지막 기록 표시";
                 states[provider].Health = ConnectionHealth.Degraded;
@@ -115,6 +149,8 @@ namespace CodexUsageBar
                 UpdateDisplay();
             };
             watcher.Start();
+            Log.Write("실행 중인 앱: " + (watcher.IsAnyProviderRunning
+                ? string.Join(", ", watcher.RunningProviders.Select(provider => provider.DisplayName())) : "없음(위젯 숨김)"));
             foreach (var provider in watcher.RunningProviders) coordinators[provider].Start(settings.Snapshot(provider));
             SyncClosedCodex();
             UpdateProvider();
@@ -128,7 +164,17 @@ namespace CodexUsageBar
             coordinators[provider] = coordinator;
             coordinator.SnapshotChanged += snapshot => { states[provider].Snapshot = snapshot; settings.SetSnapshot(provider, snapshot); UpdateDisplay(); };
             coordinator.Checked += at => { states[provider].CheckedAt = at; };
-            coordinator.StatusChanged += (status, health) => { states[provider].Status = status; states[provider].Health = health; UpdateDisplay(); };
+            coordinator.StatusChanged += (status, health) =>
+            {
+                // 정상 조회 문구는 매번 시각이 바뀌므로, 상태 단계가 바뀌거나 오류 문구가 달라질 때만 기록한다.
+                var state = states[provider];
+                bool problem = health == ConnectionHealth.Error || health == ConnectionHealth.Degraded;
+                if ((health != state.Health && health != ConnectionHealth.Working) || (problem && status != state.Status))
+                    Log.Write(provider.DisplayName() + " 상태 " + health + ": " + status);
+                state.Status = status;
+                state.Health = health;
+                UpdateDisplay();
+            };
         }
 
         /// Codex 앱이 꺼져 있어도 Claude 앱이 켜져 있으면(Claude에서 Codex CLI를 부르는 경우)

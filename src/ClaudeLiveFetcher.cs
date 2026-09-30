@@ -126,7 +126,7 @@ namespace CodexUsageBar
             request.Timeout = 15000;
             request.ReadWriteTimeout = 15000;
             request.Accept = "application/json";
-            request.UserAgent = "CodexUsageBar/1.2-windows";
+            request.UserAgent = "CCusagebar/1.2-windows";
             request.Headers["Authorization"] = "Bearer " + token.AccessToken;
             request.Headers["anthropic-beta"] = "oauth-2025-04-20";
             request.CachePolicy = new System.Net.Cache.RequestCachePolicy(System.Net.Cache.RequestCacheLevel.NoCacheNoStore);

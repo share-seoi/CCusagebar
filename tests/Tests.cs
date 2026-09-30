@@ -35,6 +35,8 @@ namespace CodexUsageBar
                 Check(credentials.AccessToken == "synthetic-token" && credentials.ExpiresAt.HasValue, "Code credentials parsed");
                 Check(ClaudeLiveFetcher.ParseCodeCredentials("{}") == null, "missing credentials");
                 Check(new ClaudeToken("synthetic", now.AddSeconds(59), "test").IsExpired(now), "expiry margin");
+                Check(SessionWatcher.IsAppCloseOnly(0x1), "updater close relaunches");
+                Check(!SessionWatcher.IsAppCloseOnly(0x80000001L) && !SessionWatcher.IsAppCloseOnly(0), "logoff/shutdown does not relaunch");
                 Check(!UsageApplicationContext.IsStale(new UsageSnapshot(snapshot.Windows, null, now.AddMinutes(-3)), now), "3-minute-old record stays opaque despite API failure");
                 Check(UsageApplicationContext.IsStale(new UsageSnapshot(snapshot.Windows, null, now.AddMinutes(-11)), now), "11-minute-old record fades");
                 Check(UsageApplicationContext.IsStale(null, now), "missing record fades");

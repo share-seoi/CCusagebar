@@ -42,7 +42,7 @@ namespace CodexUsageBar
             TopMost = true;
             KeyPreview = true;
             AutoScaleMode = AutoScaleMode.None;
-            Text = "Codex Usage Bar";
+            Text = AppInfo.Name;
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
 
             clockTimer = new Timer { Interval = 30000 };

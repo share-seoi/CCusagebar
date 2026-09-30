@@ -17,7 +17,7 @@ namespace CodexUsageBar
 
         private readonly Timer layoutTimer;
         private readonly TooltipWindow tooltip = new TooltipWindow();
-        private WidgetContent content = new WidgetContent { Tooltip = "Codex Usage Bar" };
+        private WidgetContent content = new WidgetContent { Tooltip = AppInfo.Name };
         private IntPtr trayHandle;
         private Rectangle placedBounds;
         private Rectangle screenBounds;
@@ -26,6 +26,9 @@ namespace CodexUsageBar
         private bool hover;
         private bool dark;
         private float scale = 1f;
+        // 기록은 상태가 바뀔 때만 남긴다(1초마다 확인하므로).
+        private bool trayMissing;
+        private bool attachedOnce;
         internal string LastAttachError { get; private set; }
 
         public TaskbarWidget()
@@ -82,11 +85,16 @@ namespace CodexUsageBar
             var tray = Native.FindWindow("Shell_TrayWnd", null);
             if (tray == IntPtr.Zero)
             {
+                if (!trayMissing) Log.Write("작업표시줄 창을 찾을 수 없음 · 다시 시도");
+                trayMissing = true;
                 Detach();
                 return;
             }
+            trayMissing = false;
             if (tray != trayHandle || Handle == IntPtr.Zero || !Native.IsWindow(Handle))
             {
+                if (attachedOnce && trayHandle != IntPtr.Zero && tray != trayHandle)
+                    Log.Write("작업표시줄 창이 바뀜(탐색기 재시작?) · 다시 붙임");
                 Detach();
                 trayHandle = tray;
                 Attach();
@@ -149,7 +157,7 @@ namespace CodexUsageBar
         {
             var cp = new CreateParams
             {
-                Caption = "CodexUsageBar",
+                Caption = AppInfo.Name,
                 Style = Native.WS_CHILD | Native.WS_CLIPSIBLINGS,
                 ExStyle = Native.WS_EX_LAYERED,
                 Parent = trayHandle,
@@ -159,12 +167,15 @@ namespace CodexUsageBar
             try
             {
                 CreateHandle(cp);
+                Log.Write("작업표시줄에 붙음");
+                attachedOnce = true;
                 LastAttachError = null;
                 tooltip.Attach(Handle);
                 tooltip.SetText(content.Tooltip);
             }
             catch (Exception error)
             {
+                if (error.Message != LastAttachError) Log.Write("작업표시줄에 붙기 실패: " + error.Message);
                 LastAttachError = error.Message;
                 // 작업표시줄이 아직 준비되지 않았으면 다음 확인 때 다시 시도한다.
             }

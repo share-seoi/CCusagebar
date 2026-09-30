@@ -1,4 +1,4 @@
-# Windows Codex Usage Bar
+# CCusagebar (Windows)
 
 Windows 작업표시줄에서 Codex와 Claude의 남은 사용량을 표시합니다. 배터리마다 `5h`·`W` 같은 한도 이름을 붙입니다. Claude나 Codex Plus처럼 한도가 여러 개면 한도마다 나란히 그리고, 주간 한도만 있으면 `W` 배터리 하나만 그립니다. 상세 창의 **표시** 버튼으로 앞에 띄운 앱만 보여주는 "자동 전환"과 Codex·Claude를 나란히 보여주는 "둘 다"를 고를 수 있고, 선택은 저장됩니다. 앱 아이콘과 배터리를 누르면 두 계정의 한도 및 초기화 시각을 함께 볼 수 있습니다.
 
@@ -10,7 +10,7 @@ Windows 작업표시줄에서 Codex와 Claude의 남은 사용량을 표시합�
 powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\install.ps1
 ```
 
-기본 설치 경로는 `%LOCALAPPDATA%\Programs\CodexUsageBar`입니다. `-AutoStart`를 추가하면 사용자 로그인 시 자동 실행하며, `-NoStart`는 설치 후 실행을 생략합니다. `-InstallDirectory 'C:\원하는\폴더'`로 경로를 지정할 수 있습니다. 원래 계정 정보와 사용량 캐시를 보존하고, 같은 설치 경로에서 실행 중인 위젯만 교체합니다. 다른 경로의 위젯이 실행 중이면 먼저 그 위젯의 상세 창에서 종료한 다음 새 실행 파일을 실행합니다.
+기본 설치 경로는 `%LOCALAPPDATA%\Programs\CCusagebar`입니다. `-AutoStart`를 추가하면 사용자 로그인 시 자동 실행하고, `-DesktopShortcut`을 추가하면 바탕화면에 켜기/끄기 바로가기(실행 중일 때 누르면 꺼짐)를 만들며, `-NoStart`는 설치 후 실행을 생략합니다. `-InstallDirectory 'C:\원하는\폴더'`로 경로를 지정할 수 있습니다. 원래 계정 정보와 사용량 캐시를 보존하고, 같은 설치 경로에서 실행 중인 위젯만 교체합니다. 다른 경로의 위젯이 실행 중이면 먼저 그 위젯의 상세 창에서 종료한 다음 새 실행 파일을 실행합니다.
 
 개발용으로 실행 파일만 빌드하려면 아래를 사용합니다.
 
@@ -18,10 +18,10 @@ Windows 10/11 x64 및 .NET Framework 4.8 환경에서 별도 SDK 설치 없이 �
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\build.ps1
-Start-Process .\windows\dist\CodexUsageBar.exe
+Start-Process .\windows\dist\CCusagebar.exe
 ```
 
-이 폴더에서 빌드할 때는 `powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1`을 사용합니다. 실행 파일과 같은 폴더에 `CodexUsageBar.exe.config`를 함께 둡니다.
+이 폴더에서 빌드할 때는 `powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1`을 사용합니다. 실행 파일과 같은 폴더에 `CCusagebar.exe.config`를 함께 둡니다.
 
 두 앱 중 앞에 있는 앱의 사용량을 작업표시줄에 표시하고, 다른 앱으로 전환하면 마지막 표시를 유지합니다. Codex 앱이 꺼져 있어도 Claude 앱이 켜져 있으면(Claude에서 Codex CLI를 부르는 경우 등) Codex 로컬 기록을 1분마다 확인합니다(계정 조회는 하지 않음). 둘 다 종료되면 위젯은 숨겨지고 조회도 모두 멈추며 앱 실행 감지만 유지됩니다. 상세 창의 **종료**로 완전히 종료할 수 있습니다. **자동 시작** 버튼은 현재 사용자 로그인 시 실행 여부를 설정합니다. 빌드나 첫 실행만으로 자동 시작을 등록하지 않습니다.
 
@@ -57,9 +57,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\test.ps1
 실제 사용량 진단은 다음 옵션을 사용합니다. GUI 실행 파일이므로 PowerShell에서는 출력을 리디렉션하고 종료를 기다립니다.
 
 ```powershell
-$exe = '.\windows\dist\CodexUsageBar.exe'
+$exe = '.\windows\dist\CCusagebar.exe'
 Start-Process $exe -ArgumentList '--print-claude-live-usage' -Wait -WindowStyle Hidden -RedirectStandardOutput '.\claude-usage.json' -RedirectStandardError '.\claude-error.txt'
 Get-Content '.\claude-usage.json' -Encoding UTF8
 ```
 
 옵션: `--print-claude-live-usage` (Claude 토큰 API), `--print-claude-usage` (Claude 로컬 기록), `--print-live-usage` (Codex 계정 API), `--print-usage` (Codex 로컬 기록). 출력에는 사용량과 시각만 포함하고 로그인 토큰은 포함하지 않습니다.
+
+## 기록과 이전 이름
+
+시작·종료·오류·연결 상태 변화는 `%LOCALAPPDATA%\CCusagebar\log.txt`에 남습니다(256KB 넘으면 `log.old.txt`로 교체). 다른 앱 업데이트가 위젯을 닫으면 20초 뒤 다시 켜집니다. 예전 이름(CodexUsageBar)으로 설치돼 있었다면 설치 스크립트가 기존 설치를 교체하면서 자동 시작과 바탕화면 바로가기 설정을 이어받고, 앱이 데이터 폴더를 새 이름으로 옮깁니다.
