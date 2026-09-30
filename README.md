@@ -1,69 +1,83 @@
 # CCusagebar (Windows)
 
-Windows 작업표시줄에서 Codex와 Claude의 남은 사용량을 표시합니다. 배터리마다 `5h`·`W` 같은 한도 이름을 붙입니다. Claude나 Codex Plus처럼 한도가 여러 개면 한도마다 나란히 그리고, 주간 한도만 있으면 `W` 배터리 하나만 그립니다. 상세 창의 **표시** 버튼으로 앞에 띄운 앱만 보여주는 "자동 전환"과 Codex·Claude를 나란히 보여주는 "둘 다"를 고를 수 있고, 선택은 저장됩니다. 앱 아이콘과 배터리를 누르면 두 계정의 한도 및 초기화 시각을 함께 볼 수 있습니다.
+**작업표시줄에 배터리 하나. Codex·Claude 남은 사용량을 한눈에.**
 
-## 실행과 빌드
+> Mac을 쓰시나요? 메뉴 막대 버전은 **[CCusagebar (mac)](https://github.com/share-seoi/CCusagebar-mac)** 에 있습니다.
 
-다른 PC에 설치할 때는 저장소 루트에서 다음 한 줄을 실행하면 빌드·설치·실행을 처리합니다.
+<p align="center">
+  <img src="docs/images/taskbar-codex.png" alt="Codex를 쓰는 중: 작업표시줄에 Codex 주간 한도 W 96% 배터리" width="555"><br>
+  <sub>Codex를 쓰는 중</sub><br><br>
+  <img src="docs/images/taskbar-claude.png" alt="Claude를 쓰는 중: 작업표시줄에 Claude 5시간 100%·주간 86% 배터리" width="561"><br>
+  <sub>Claude를 쓰는 중</sub>
+</p>
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\install.ps1
-```
+지금 쓰고 있는 앱의 남은 한도를 작업표시줄에 배터리로 보여줍니다. **Codex를 앞에 띄우면 Codex, Claude를 띄우면 Claude 사용량으로 자동으로 바뀌고**, 게임이나 브라우저 같은 다른 앱으로 넘어가면 마지막 표시를 그대로 둡니다.
 
-기본 설치 경로는 `%LOCALAPPDATA%\Programs\CCusagebar`입니다. `-AutoStart`를 추가하면 사용자 로그인 시 자동 실행하고, `-DesktopShortcut`을 추가하면 바탕화면에 켜기/끄기 바로가기(실행 중일 때 누르면 꺼짐)를 만들며, `-NoStart`는 설치 후 실행을 생략합니다. `-InstallDirectory 'C:\원하는\폴더'`로 경로를 지정할 수 있습니다. 원래 계정 정보와 사용량 캐시를 보존하고, 같은 설치 경로에서 실행 중인 위젯만 교체합니다. 다른 경로의 위젯이 실행 중이면 먼저 그 위젯의 상세 창에서 종료한 다음 새 실행 파일을 실행합니다.
+배터리마다 `5h`(5시간 한도)·`W`(주간 한도) 이름표가 붙습니다. 계정에 한도가 둘이면(Claude, Codex Plus 등) 두 개가 나란히, 주간 한도만 있으면 `W` 하나만 나옵니다.
 
-개발용으로 실행 파일만 빌드하려면 아래를 사용합니다.
+둘 다 계속 보고 싶으면 상세 창의 **표시** 버튼을 눌러 **둘 다**로 바꾸세요. Codex와 Claude가 나란히 뜹니다.
 
-Windows 10/11 x64 및 .NET Framework 4.8 환경에서 별도 SDK 설치 없이 빌드합니다.
+<p align="center">
+  <img src="docs/images/taskbar-both.png" alt="둘 다 표시: 작업표시줄에 Codex W 96%, Claude 5h 84%·W 84% 배터리가 나란히" width="535"><br>
+  <sub>표시: 둘 다</sub>
+</p>
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\build.ps1
-Start-Process .\windows\dist\CCusagebar.exe
-```
+배터리를 누르면 두 계정의 한도와 초기화 시각이 함께 나옵니다. 그게 전부입니다.
 
-이 폴더에서 빌드할 때는 `powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1`을 사용합니다. 실행 파일과 같은 폴더에 `CCusagebar.exe.config`를 함께 둡니다.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/popup-dark.png">
+    <img src="docs/images/popup-light.png" alt="Codex·Claude 사용량 상세 창" width="560">
+  </picture>
+</p>
 
-두 앱 중 앞에 있는 앱의 사용량을 작업표시줄에 표시하고, 다른 앱으로 전환하면 마지막 표시를 유지합니다. Codex 앱이 꺼져 있어도 Claude 앱이 켜져 있으면(Claude에서 Codex CLI를 부르는 경우 등) Codex 로컬 기록을 1분마다 확인합니다(계정 조회는 하지 않음). 둘 다 종료되면 위젯은 숨겨지고 조회도 모두 멈추며 앱 실행 감지만 유지됩니다. 상세 창의 **종료**로 완전히 종료할 수 있습니다. **자동 시작** 버튼은 현재 사용자 로그인 시 실행 여부를 설정합니다. 빌드나 첫 실행만으로 자동 시작을 등록하지 않습니다.
+## 설치 (Windows 10/11)
 
-## Claude: 로그인 토큰으로 직접 조회
-
-- `https://api.anthropic.com/api/oauth/usage`에 GET 요청을 보내 5시간/주간 사용률과 초기화 시각을 읽습니다. 위젯이 Claude를 표시 중이면(둘 다 표시 포함) **1분마다**, Codex만 표시 중이면 **3분마다** 조회하고, Claude로 전환하거나 상세 창을 열 때는 바로 한 번 조회합니다(20초 이내 재조회는 생략). 모델 추론을 요청하지 않습니다.
-- 이 API는 토큰마다 조회 제한(HTTP 429)이 있고 Claude 앱도 같은 토큰으로 조회하므로 간격을 넉넉히 둡니다.
-- 기본적으로 Claude 데스크톱 앱의 `oauth:tokenCacheV2`를 읽습니다. 일반 설치와 Microsoft Store 설치의 `LocalCache\Roaming\Claude` 경로를 지원하며 Windows DPAPI/CNG로 현재 사용자에게 저장된 토큰을 읽습니다.
-- 데스크톱 프로필이 없으면 Claude Code의 `%USERPROFILE%\.claude\.credentials.json`을 사용합니다. `CLAUDE_CONFIG_DIR`이 있으면 그 경로를 따릅니다. 데스크톱 토큰이 만료되거나 거부됐을 때 다른 계정으로 자동 전환하지 않습니다.
-- 고급 설정으로 `CLAUDE_USAGE_ACCESS_TOKEN` 환경 변수를 지정하면 해당 토큰을 우선 사용합니다. 토큰을 명령행 인수나 로그에 넣지 마세요.
-- 로그인 정보와 refresh token을 수정하지 않으며, 토큰을 별도 파일에 복사하지 않습니다. 각 조회마다 원본에서 다시 읽으므로 Claude가 갱신한 토큰을 반영합니다.
-- HTTP 429에서는 `Retry-After`를 존중하며, 헤더가 없으면 2분부터 최대 15분까지 재시도 간격을 늘립니다. 수동 새로고침도 제한을 우회하지 않습니다.
-- API 조회가 실패하면 마지막으로 받은 값이나 로컬 사용량 기록을 유지하고, 상세 창에 인증/네트워크 오류와 데이터 시각을 표시합니다. 오래된 로컬 기록을 사용량 0%로 바꾸지 않습니다.
-- 작업표시줄 배터리는 표시 중인 값이 **10분보다 오래됐을 때만** 흐리게 표시합니다. 조회가 실패해도 Claude 앱의 로컬 기록이 최근이면 선명하게 유지합니다.
-- 사용량 API는 공개적으로 안정성을 보장하는 API가 아니므로 응답/인증 형식이 바뀔 수 있습니다. 관련 자료: [Claude Code 인증 정보 저장 위치](https://code.claude.com/docs/en/authentication#credential-management), [Anthropic 저장소의 사용량 API 429 보고](https://github.com/anthropics/claude-code/issues/31021).
-
-## Codex
-
-- 로컬 세션의 사용량 기록을 **20초마다** 확인합니다.
-- 앱 시작, **새로고침**, Codex로 전환할 때(마지막 조회 후 1분이 지났을 때만)는 Codex App Server의 `account/rateLimits/read`로 실시간 계정 한도를 조회하고 조회용 프로세스를 종료합니다.
-- 현재 Store 버전의 `OpenAI.Codex_*\app\ChatGPT.exe`와 이전 `Codex.exe`를 감지합니다. 일반 ChatGPT 앱이나 CLI만 실행된 경우는 제외합니다.
-- 새 버전의 `%LOCALAPPDATA%\OpenAI\Codex\bin\<version>\codex.exe` 조회 경로도 지원합니다.
-- 서버가 제공한 한도만 표시합니다. 주간 한도만 반환되는 계정에 5시간 한도를 임의로 추가하지 않습니다.
-
-## 검증과 진단
+PowerShell에서:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\windows\test.ps1
+git clone https://github.com/share-seoi/CCusagebar.git
+cd CCusagebar
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-테스트는 합성 토큰을 사용하며 네트워크를 호출하지 않습니다. 응답 해석, 토큰 만료, 조회 간격, 흐림 표시 기준, HTTP 오류/재시도 제한, 실패 후 상태 표시, 앱 감지, UI 렌더링을 확인합니다. 렌더 결과는 `windows\test-output`에 저장됩니다.
+- 관리자 권한, .NET SDK, Node, Python 모두 필요 없습니다. Windows에 기본으로 있는 .NET Framework 4.8로 소스에서 바로 빌드합니다.
+- `%LOCALAPPDATA%\Programs\CCusagebar`에 `CCusagebar.exe`로 설치되고 바로 실행됩니다. 바탕화면 켜기/끄기 바로가기가 필요하면 `-DesktopShortcut`을 붙이세요.
+- 로그인할 때 자동으로 켜지게 하려면 명령 끝에 `-AutoStart`를 붙이거나, 위젯 상세 창의 **자동 시작** 버튼을 누르세요.
+- 설치 전에 코드를 확인하고 싶다면 `.\test.ps1`을 먼저 실행하세요. 네트워크 없이 합성 데이터로 동작을 검사합니다.
 
-실제 사용량 진단은 다음 옵션을 사용합니다. GUI 실행 파일이므로 PowerShell에서는 출력을 리디렉션하고 종료를 기다립니다.
+## 사용법
 
-```powershell
-$exe = '.\windows\dist\CCusagebar.exe'
-Start-Process $exe -ArgumentList '--print-claude-live-usage' -Wait -WindowStyle Hidden -RedirectStandardOutput '.\claude-usage.json' -RedirectStandardError '.\claude-error.txt'
-Get-Content '.\claude-usage.json' -Encoding UTF8
-```
+1. Codex 또는 Claude 데스크톱 앱에 평소처럼 로그인해 둡니다.
+2. 둘 중 하나를 열면 작업표시줄에 사용량이 나타납니다. 둘 다 닫으면 위젯도 숨습니다.
+3. 배터리를 누르면 상세 창이 열립니다: **새로고침**, **자동 시작** 켜기/끄기, **표시**(자동 전환 ↔ 둘 다), **종료**.
 
-옵션: `--print-claude-live-usage` (Claude 토큰 API), `--print-claude-usage` (Claude 로컬 기록), `--print-live-usage` (Codex 계정 API), `--print-usage` (Codex 로컬 기록). 출력에는 사용량과 시각만 포함하고 로그인 토큰은 포함하지 않습니다.
+남은 양이 적으면 배터리가 빨갛게 바뀝니다.
 
-## 기록과 이전 이름
+## 어떻게 읽어 오나요
 
-시작·종료·오류·연결 상태 변화는 `%LOCALAPPDATA%\CCusagebar\log.txt`에 남습니다(256KB 넘으면 `log.old.txt`로 교체). 다른 앱 업데이트가 위젯을 닫으면 20초 뒤 다시 켜집니다. 예전 이름(CodexUsageBar)으로 설치돼 있었다면 설치 스크립트가 기존 설치를 교체하면서 자동 시작과 바탕화면 바로가기 설정을 이어받고, 앱이 데이터 폴더를 새 이름으로 옮깁니다.
+- **Codex:** 로컬 세션 기록을 20초마다 확인하고, 시작·새로고침 때와 Codex로 전환할 때(1분에 한 번까지) Codex 앱 서버로 계정 한도를 조회합니다. 다른 기기에서 쓴 양도 이때 반영됩니다. Codex 앱이 꺼져 있어도 Claude 앱이 켜져 있으면 로컬 기록을 1분마다 확인합니다.
+- 상세 창의 연결 상태에 **마지막 조회** 시각이 나옵니다.
+- **Claude:** 이 PC에 저장된 Claude 로그인 토큰을 **읽기만** 해서 사용량 API를 조회합니다. 배터리가 Claude를 표시 중이면 1분, 아니면 3분 간격이고, Claude로 전환하거나 상세 창을 열면 바로 새로 받아옵니다. 모델 추론은 요청하지 않습니다.
+- 배터리가 흐려지면 표시 중인 숫자가 10분 넘게 갱신되지 않았다는 뜻입니다. 이유는 상세 창에 나옵니다.
+- 토큰을 복사·수정·전송하지 않으며, 저장소에도 계정 정보는 들어 있지 않습니다. 설치하는 사람의 PC에 로그인된 계정이 표시됩니다.
+- 시작·종료·오류 같은 드문 사건만 `%LOCALAPPDATA%\CCusagebar\log.txt`에 남깁니다(최대 256KB).
+
+자세한 동작과 진단 옵션은 [상세 안내](docs/details.md)를 참고하세요.
+
+## 제거
+
+1. 자동 시작을 켰다면 위젯 상세 창에서 먼저 끕니다.
+2. 상세 창에서 **종료**를 누릅니다.
+3. `%LOCALAPPDATA%\Programs\CCusagebar`(프로그램)와 `%LOCALAPPDATA%\CCusagebar`(마지막 사용량 캐시·기록) 폴더를 지웁니다.
+
+## 참고
+
+- 개인이 만든 비공식 도구이며 OpenAI, Anthropic과 관계가 없습니다.
+- 사용량 조회에 쓰는 API는 공개적으로 보장된 API가 아니어서, 앱이 업데이트되면 동작이 바뀔 수 있습니다.
+- 에이전트(Codex, Claude Code 등)에게 설치를 맡길 때는 [AGENTS.md](AGENTS.md)를 읽게 하면 됩니다.
+- 예전 주소 `share-seoi/CodexUsageBar`는 이제 Mac 버전 저장소(`CCusagebar-mac`)로 연결됩니다. 예전에 받은 폴더에서 Windows 버전을 계속 받으려면 `git remote set-url origin https://github.com/share-seoi/CCusagebar.git`을 실행하세요.
+
+## 라이선스
+
+[MIT](LICENSE)

@@ -8,7 +8,7 @@ $arguments = @('/nologo', '/target:winexe', '/platform:x64', '/optimize+', '/war
     "/out:$OutputDirectory\CCusagebar.exe", "/win32manifest:$PSScriptRoot\app.manifest", "/win32icon:$PSScriptRoot\assets\ccusagebar.ico",
     '/r:System.dll', '/r:System.Core.dll', '/r:System.Drawing.dll', '/r:System.Windows.Forms.dll',
     '/r:System.Web.Extensions.dll', '/r:System.Security.dll')
-$resources = Join-Path $PSScriptRoot '..\Resources'
+$resources = Join-Path $PSScriptRoot 'assets'
 if (Test-Path -LiteralPath (Join-Path $resources 'icon-codex-light.png')) {
     $arguments += "/resource:$resources\icon-codex-light.png,codex-light.png"
     $arguments += "/resource:$resources\icon-codex-dark-color.png,codex-dark.png"
