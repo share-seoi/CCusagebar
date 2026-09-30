@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Windows.Forms;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     /// 로그오프·종료나 설치 프로그램(Restart Manager)의 종료 요청을 받는 숨은 최상위 창.
     /// 요청을 받고도 끝나지 않으면 Windows가 "응답 없음"으로 강제 종료하므로 바로 끝낸다.

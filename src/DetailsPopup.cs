@@ -6,7 +6,7 @@ using System.Drawing.Text;
 using System.Linq;
 using System.Windows.Forms;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     /// 위젯을 누르면 작업표시줄 위에 뜨는 상세 창. Mac 버전 메뉴처럼 두 앱의 한도를 카드로 나란히 보여준다.
     internal sealed class DetailsPopup : Form

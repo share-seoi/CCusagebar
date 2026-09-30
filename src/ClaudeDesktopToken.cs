@@ -6,7 +6,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     internal sealed class ClaudeToken
     {

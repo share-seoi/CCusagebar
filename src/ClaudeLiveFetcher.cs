@@ -5,7 +5,7 @@ using System.IO;
 using System.Net;
 using System.Text;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     internal sealed class ClaudeUsageResponse
     {

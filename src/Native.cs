@@ -2,7 +2,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     internal static class Native
     {

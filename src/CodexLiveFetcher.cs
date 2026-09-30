@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using Microsoft.Win32;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     internal sealed class LiveUsageException : Exception
     {

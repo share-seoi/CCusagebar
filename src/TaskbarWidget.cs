@@ -3,7 +3,7 @@ using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     /// Windows 11 작업표시줄(Shell_TrayWnd) 안, 알림 영역(숨겨진 아이콘 ^) 바로 왼쪽에 붙는 자식 창.
     /// 픽셀 단위 알파(UpdateLayeredWindow)로 그려서 작업표시줄 배경이 그대로 비친다.

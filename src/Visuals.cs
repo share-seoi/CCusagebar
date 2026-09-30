@@ -9,7 +9,7 @@ using System.Linq;
 using System.Reflection;
 using Microsoft.Win32;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     internal static class Theme
     {

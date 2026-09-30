@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using Microsoft.Win32;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     /// 마지막으로 표시한 앱, "둘 다 표시" 여부, 마지막 스냅샷을 %LOCALAPPDATA%\CCusagebar\state.json에 저장한다.
     internal sealed class AppSettings

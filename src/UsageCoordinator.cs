@@ -2,7 +2,7 @@ using System;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     internal enum UsageProvider
     {

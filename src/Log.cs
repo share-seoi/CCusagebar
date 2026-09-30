@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Text;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     /// 앱 이름과 데이터 폴더(%LOCALAPPDATA%\CCusagebar).
     internal static class AppInfo

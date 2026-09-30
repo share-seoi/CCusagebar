@@ -4,7 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     internal sealed class UsageStoreException : Exception
     {

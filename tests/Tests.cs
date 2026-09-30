@@ -6,7 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     internal static class Tests
     {

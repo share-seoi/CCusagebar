@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     /// Codex·Claude 데스크톱 앱의 실행/종료와 맨 앞 창 전환을 감지한다. 이벤트는 UI 스레드에서 호출된다.
     internal sealed class ProviderWatcher : IDisposable

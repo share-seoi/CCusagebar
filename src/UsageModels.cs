@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Web.Script.Serialization;
 
-namespace CodexUsageBar
+namespace CCusagebar
 {
     internal sealed class UsageWindow
     {
