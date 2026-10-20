@@ -54,6 +54,17 @@ namespace CCusagebar
                 catch (IOException) { }
                 catch (UnauthorizedAccessException) { }
             }
+            // 2026-10 이후 Store 설치는 데이터를 %LOCALAPPDATA%\Claude-Data\claude_<패키지 ID>로 옮긴다.
+            var dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Claude-Data");
+            if (Directory.Exists(dataRoot))
+            {
+                try
+                {
+                    directories.AddRange(Directory.GetDirectories(dataRoot, "claude_*"));
+                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            }
             directories.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Claude"));
             return directories.Where(dir => File.Exists(Path.Combine(dir, "config.json")))
                 .OrderByDescending(dir => File.GetLastWriteTimeUtc(Path.Combine(dir, "config.json")));

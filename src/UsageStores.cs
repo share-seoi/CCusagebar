@@ -216,7 +216,7 @@ namespace CCusagebar
             return ParseHistory(text, DateTime.UtcNow);
         }
 
-        /// 일반 설치(%APPDATA%\Claude)와 MSIX 가상화 경로 중 가장 최근에 기록된 파일을 쓴다.
+        /// 일반 설치(%APPDATA%\Claude), MSIX 가상화 경로, %LOCALAPPDATA%\Claude-Data 중 가장 최근에 기록된 파일을 쓴다.
         public static string HistoryPath()
         {
             var candidates = new List<string>
@@ -230,6 +230,12 @@ namespace CCusagebar
                 {
                     candidates.AddRange(Directory.EnumerateDirectories(packages, "Claude_*")
                         .Select(dir => Path.Combine(dir, "LocalCache", "Roaming", "Claude", "plan-usage-history.json")));
+                }
+                var dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Claude-Data");
+                if (Directory.Exists(dataRoot))
+                {
+                    candidates.AddRange(Directory.EnumerateDirectories(dataRoot, "claude_*")
+                        .Select(dir => Path.Combine(dir, "plan-usage-history.json")));
                 }
             }
             catch (IOException)
