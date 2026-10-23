@@ -93,11 +93,13 @@ namespace CCusagebar
         private readonly System.Windows.Forms.Timer clockTimer;
         private UsageProvider active;
 
-        // The usage endpoint rate-limits per token (HTTP 429), and the Claude app polls it too.
-        // Poll often only while the widget shows Claude; switching to Claude or opening the
-        // popup still refreshes at once (RefreshLive keeps its own 20-second floor).
+        // The usage endpoint rate-limits per token (HTTP 429), and the Claude app and Claude Code
+        // poll it too. Poll often only while the widget shows Claude. Switching to Claude refreshes
+        // at most once per ClaudeSwitchRefreshAge, so alt-tabbing cannot burn the limit into a long
+        // backoff; opening the popup still refreshes at once (RefreshLive keeps its 20-second floor).
         internal static readonly TimeSpan ClaudeShownInterval = TimeSpan.FromMinutes(1);
         internal static readonly TimeSpan ClaudeHiddenInterval = TimeSpan.FromMinutes(3);
+        internal static readonly TimeSpan ClaudeSwitchRefreshAge = TimeSpan.FromMinutes(1);
         internal static readonly TimeSpan StaleAge = TimeSpan.FromMinutes(10);
         // Codex has no periodic live lookup (each one starts a helper process); switching to
         // Codex refreshes it instead, at most once a minute so alt-tabbing stays cheap.
@@ -144,8 +146,8 @@ namespace CCusagebar
             {
                 active = provider;
                 settings.SetLastActiveProvider(provider);
-                if (provider == UsageProvider.Claude) coordinators[provider].RefreshLive(false);
-                else coordinators[provider].RefreshLiveIfOlderThan(CodexSwitchRefreshAge);
+                coordinators[provider].RefreshLiveIfOlderThan(
+                    provider == UsageProvider.Claude ? ClaudeSwitchRefreshAge : CodexSwitchRefreshAge);
                 UpdateDisplay();
             };
             watcher.Start();

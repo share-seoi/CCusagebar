@@ -79,6 +79,39 @@ namespace CCusagebar
                 fakeResponse = new ClaudeUsageResponse { StatusCode = 200, Body = Payload };
                 fetcher.FetchSynchronously();
                 Check(calls == limitedCalls + 1, "recovers after cooldown");
+                Check(UsageApplicationContext.ClaudeSwitchRefreshAge == TimeSpan.FromMinutes(1), "switching to Claude refreshes at most once a minute");
+
+                // 429 without Retry-After: 1, 2, 4, then capped at 5 minutes; a success resets it.
+                // Each wait is counted second by second until a request goes out again (and is limited again).
+                var waits = new List<int>();
+                fakeResponse = new ClaudeUsageResponse { StatusCode = 429 };
+                Expect(() => fetcher.FetchSynchronously(), "429 backoff");
+                for (int i = 0; i < 4; i++)
+                {
+                    int sent = calls, seconds = 0;
+                    do
+                    {
+                        now = now.AddSeconds(1);
+                        seconds++;
+                        try { fetcher.FetchSynchronously(); } catch (LiveUsageException) { }
+                    } while (calls == sent);
+                    waits.Add(seconds);
+                }
+                Check(waits.SequenceEqual(new[] { 60, 120, 240, 300 }), "429 backoff 1, 2, 4, 5 minutes: " + string.Join(",", waits));
+                now = now.AddMinutes(10);
+                fakeResponse = new ClaudeUsageResponse { StatusCode = 200, Body = Payload };
+                fetcher.FetchSynchronously();
+                fakeResponse = new ClaudeUsageResponse { StatusCode = 429 };
+                Expect(() => fetcher.FetchSynchronously(), "429 after success");
+                now = now.AddSeconds(ClaudeLiveFetcher.InitialBackoffSeconds - 1);
+                limitedCalls = calls;
+                Expect(() => fetcher.FetchSynchronously(), "backoff reset to a minute");
+                Check(calls == limitedCalls, "backoff reset holds its minute");
+                now = now.AddSeconds(2);
+                fakeResponse = new ClaudeUsageResponse { StatusCode = 200, Body = Payload };
+                fetcher.FetchSynchronously();
+                Check(calls == limitedCalls + 1, "backoff reset recovers after a minute");
+
                 Check(ClaudeLiveFetcher.RetryTime(now.AddMinutes(20).ToString("R"), now, 120) == now.AddMinutes(20), "HTTP date retry header");
                 Check(ClaudeLiveFetcher.RetryTime("NaN", now, 120) == now.AddSeconds(120), "invalid retry header");
                 Check(ClaudeLiveFetcher.RetryTime("1", now, 120) == now.AddSeconds(120), "minimum backoff respected");

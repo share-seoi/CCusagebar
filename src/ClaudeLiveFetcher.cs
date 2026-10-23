@@ -21,8 +21,12 @@ namespace CCusagebar
         private readonly Func<ClaudeToken, ClaudeUsageResponse> send;
         private readonly Func<DateTime> clock;
         private readonly object gate = new object();
+        // 429 without a longer Retry-After waits 1, 2, 4, then 5 minutes at most: the Claude app and
+        // Claude Code share the token's limit, so a long doubling left the widget on stale numbers.
+        internal const int InitialBackoffSeconds = 60;
+        internal const int MaxBackoffSeconds = 300;
         private DateTime retryAt;
-        private int backoffSeconds = 120;
+        private int backoffSeconds = InitialBackoffSeconds;
 
         public ClaudeLiveFetcher() : this(ReadToken, Send, () => DateTime.UtcNow) { }
 
@@ -52,7 +56,7 @@ namespace CCusagebar
                 if (response.StatusCode == 200)
                 {
                     var result = ParseUsage(response.Body, clock());
-                    backoffSeconds = 120;
+                    backoffSeconds = InitialBackoffSeconds;
                     return result;
                 }
                 if (response.StatusCode == 401 || response.StatusCode == 403)
@@ -60,7 +64,7 @@ namespace CCusagebar
                 if (response.StatusCode == 429)
                 {
                     retryAt = RetryTime(response.RetryAfter, clock(), backoffSeconds);
-                    backoffSeconds = Math.Min(backoffSeconds * 2, 900);
+                    backoffSeconds = Math.Min(backoffSeconds * 2, MaxBackoffSeconds);
                     throw new LiveUsageException("Claude 조회 제한 · " + retryAt.ToLocalTime().ToString("HH:mm:ss") + " 이후 재시도");
                 }
                 throw new LiveUsageException("Claude 사용량 조회 실패 (HTTP " + response.StatusCode + ")");
